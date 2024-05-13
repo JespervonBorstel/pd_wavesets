@@ -6,7 +6,7 @@
 lib.name = wavesetplayer~
 
 # input source file (class name == source file basename)
-class.sources = wavesetplayer~.c
+class.sources = wavesetplayer~.c;
 
 # all extra files to be included in binary distribution of the library
 datafiles =

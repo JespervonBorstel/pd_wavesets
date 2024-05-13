@@ -22,7 +22,7 @@ void *wavesetplayer_tilde_new(t_symbol *s, int argc, t_atom *argv)
   x->x_f = 0;
   x->x_out = outlet_new(&x->x_obj, &s_signal);
   x->f_out = outlet_new(&x->x_obj, &s_float);
-  x->b_out = outlet_new(&x->x_obj, &s_bang);
+  x->trig_out = outlet_new(&x->x_obj, &s_signal);
   return (x);
 }
 
@@ -31,7 +31,8 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
   t_wavesetplayer_tilde *x = (t_wavesetplayer_tilde *)(w[1]);
   t_sample *in = (t_sample *)(w[2]);
   t_sample *out = (t_sample *)(w[3]);
-  int n = (int)(w[4]), i, maxindex;
+  t_sample *trig_out = (t_sample *)(w[4]);
+  int n = (int)(w[5]), i, maxindex;
   t_word *buf;
   
   t_waveset cur_waveset = x->waveset_array[x->current_waveset];
@@ -41,12 +42,11 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
   if (!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0) || x->num_wavesets == 0)
     goto zero;
   maxindex -= 1;
-
+  
   for (i = 0; i < n; i++) {
-    outlet_bang(x->b_out);
+    trig_out[i] = (index == cur_waveset.end_index) ? 1 : 0;
     // in case playing a waveset is finished, a new waveset starts playing
     if(index > cur_waveset.end_index || index > maxindex) {
-      
       int waveset_index = in[i];
       // clip the waveset_index
       waveset_index = (waveset_index >= num_wavesets) ? num_wavesets - 1 : waveset_index;
@@ -59,13 +59,14 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
     index++;
   }
   x->current_index = index;
-  //post("current waveset: %d", x->current_waveset);
-  //post("%d", (int)in[0]);
-  return (w+5);
-
+  return (w+6);
+  
  zero:
-  while (n--) *out++ = 0;
-  return (w+5);
+  while (n--) {
+    *out++ = 0;
+    *trig_out++ = 0;
+  } 
+  return (w+6);
 }
 
 
@@ -107,8 +108,8 @@ void wavesetplayer_tilde_set(t_wavesetplayer_tilde *x, t_symbol *s,
 
 void wavesetplayer_tilde_dsp(t_wavesetplayer_tilde *x, t_signal **sp)
 {
-     dsp_add(wavesetplayer_tilde_perform, 4, x,
-	     sp[0]->s_vec, sp[1]->s_vec, sp[0]->s_n);
+     dsp_add(wavesetplayer_tilde_perform, 5, x,
+	     sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[0]->s_n);
 }
 
 void wavesetplayer_tilde_free(t_wavesetplayer_tilde *x)
@@ -117,7 +118,7 @@ void wavesetplayer_tilde_free(t_wavesetplayer_tilde *x)
     free_wavesets(x);
     outlet_free(x->x_out);
     outlet_free(x->f_out);
-    outlet_free(x->b_out);
+    outlet_free(x->trig_out);
 }
 
 void wavesetplayer_tilde_setup(void)

@@ -20,7 +20,7 @@ typedef struct _wavesetplayer_tilde
   int current_waveset;
   int current_index;
 
-  t_outlet* x_out, *f_out, *b_out;
+  t_outlet* x_out, *f_out, *trig_out;
 
 } t_wavesetplayer_tilde;
 
