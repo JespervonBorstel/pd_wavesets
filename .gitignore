@@ -1,0 +1,4 @@
+*.o
+*.wav
+tab_reference.c
+*.pd_linux
