@@ -1,34 +1,48 @@
 #include "wavesets.h"
 #include "analyse.h"
 
-/* ---------- basic prototype that plays wavesets based on an index  ---------- */
+/*
+  wavesetstepper: wavesetplayer with additional Features
+     - reads a certain amount of wavesets from an array by increment starting from the waveset
+       specified by the index given in the first inlet.
+     - waveset omission added later
 
-static t_class *wavesetplayer_tilde_class;
+ */
 
-void *wavesetplayer_tilde_new(t_symbol *s, int argc, t_atom *argv)
+static t_class *wavesetstepper_tilde_class;
+
+void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
 {
-  t_wavesetplayer_tilde *x = (t_wavesetplayer_tilde *)pd_new(wavesetplayer_tilde_class);
+  t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)pd_new(wavesetstepper_tilde_class);
   arrayvec_init(&x->x_v, x, argc, argv);
   arrayvec_testvec(&x->x_v);
   
   t_word* buf;
   int maxindex;
   if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0))
-    pd_error(x, "wavesetplayer~: couldn't read array");
-  analyse_wavesets(x, buf, maxindex);
+    pd_error(x, "wavesetstepper~: couldn't read array");
+  analyse_wavesets_stepper(x, buf, maxindex);
   x->current_waveset = 0;
   x->current_index = x->waveset_array[0].start_index;
   
   x->x_f = 0;
+  x->step = 0;
+  x->step_c = 0;
+  x->delta = 1;
+  x->delta_c = 0;
+
+  x->step_in = floatinlet_new(&x->x_obj, &x->step);
+  x->delta_in = floatinlet_new(&x->x_obj, &x->delta);
+  
   x->x_out = outlet_new(&x->x_obj, &s_signal);
   x->f_out = outlet_new(&x->x_obj, &s_float);
   x->trig_out = outlet_new(&x->x_obj, &s_signal);
   return (x);
 }
 
-t_int *wavesetplayer_tilde_perform(t_int *w)
+t_int *wavesetstepper_tilde_perform(t_int *w)
 {
-  t_wavesetplayer_tilde *x = (t_wavesetplayer_tilde *)(w[1]);
+  t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)(w[1]);
   t_sample *in = (t_sample *)(w[2]);
   t_sample *out = (t_sample *)(w[3]);
   t_sample *trig_out = (t_sample *)(w[4]);
@@ -44,13 +58,23 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
   maxindex -= 1;
   
   for (i = 0; i < n; i++) {
-    trig_out[i] = (index == cur_waveset.end_index) ? 1 : 0;
+    trig_out[i] = (index == cur_waveset.end_index && x->delta_c > x->delta) ? 1 : 0;
     // in case playing a waveset is finished, a new waveset starts playing
     if(index > cur_waveset.end_index || index > maxindex) {
-      int waveset_index = in[i];
+      x->step_c += x->step;
+      x->delta_c += 1;
+      int waveset_index;
+      
+      if(x->delta_c >= x->delta) {
+	x->step_c = 0;
+	x->delta_c = 0;
+      }
+
+      waveset_index = in[i] + floor(x->step_c);
       // clip the waveset_index
       waveset_index = (waveset_index >= num_wavesets) ? num_wavesets - 1 : waveset_index;
       waveset_index = (waveset_index < 0) ? 0 : waveset_index;
+      
       cur_waveset = x->waveset_array[waveset_index];
       x->current_waveset = waveset_index;
       index = cur_waveset.start_index;
@@ -70,7 +94,7 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
 }
 
 
-void wavesetplayer_tilde_print(t_wavesetplayer_tilde* x)
+void wavesetstepper_tilde_print(t_wavesetstepper_tilde* x)
 {
   if(x->num_wavesets == 0) {
     post("waveset_array empty");
@@ -87,12 +111,12 @@ void wavesetplayer_tilde_print(t_wavesetplayer_tilde* x)
   }
 }
 
-void wavesetplayer_tilde_size(t_wavesetplayer_tilde* x)
+void wavesetstepper_tilde_size(t_wavesetstepper_tilde* x)
 {
   outlet_float(x->f_out, x->num_wavesets);
 }
 
-void wavesetplayer_tilde_set(t_wavesetplayer_tilde *x, t_symbol *s,
+void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s,
     int argc, t_atom *argv)
 {
     arrayvec_set(&x->x_v, argc, argv);
@@ -100,44 +124,47 @@ void wavesetplayer_tilde_set(t_wavesetplayer_tilde *x, t_symbol *s,
     t_word* buf;
     
     if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0))
-      pd_error(x, "wavesetplayer~: couldn't read array");
-    analyse_wavesets(x, buf, maxindex);
+      pd_error(x, "wavesetstepper~: couldn't read array");
+    analyse_wavesets_stepper(x, buf, maxindex);
     x->current_waveset = 0;
     x->current_index = 0;
 }
 
-void wavesetplayer_tilde_dsp(t_wavesetplayer_tilde *x, t_signal **sp)
+void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
 {
-     dsp_add(wavesetplayer_tilde_perform, 5, x,
+     dsp_add(wavesetstepper_tilde_perform, 5, x,
 	     sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[0]->s_n);
 }
 
-void wavesetplayer_tilde_free(t_wavesetplayer_tilde *x)
+void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
 {
     arrayvec_free(&x->x_v);
-    free_wavesets_player(x);
+    free_wavesets_stepper(x);
+
+    inlet_free(x->step_in);
+    inlet_free(x->delta_in);
     outlet_free(x->x_out);
     outlet_free(x->f_out);
     outlet_free(x->trig_out);
 }
 
-void wavesetplayer_tilde_setup(void)
+void wavesetstepper_tilde_setup(void)
 {
-  wavesetplayer_tilde_class = class_new(gensym("wavesetplayer~"),
-					(t_newmethod)wavesetplayer_tilde_new,
-					(t_method)wavesetplayer_tilde_free,
-					sizeof(t_wavesetplayer_tilde),
+  wavesetstepper_tilde_class = class_new(gensym("wavesetstepper~"),
+					(t_newmethod)wavesetstepper_tilde_new,
+					(t_method)wavesetstepper_tilde_free,
+					sizeof(t_wavesetstepper_tilde),
 					CLASS_DEFAULT,
 					A_GIMME,
 					0);
-  CLASS_MAINSIGNALIN(wavesetplayer_tilde_class, t_wavesetplayer_tilde, x_f);
-  class_addmethod(wavesetplayer_tilde_class, (t_method)wavesetplayer_tilde_dsp,
+  CLASS_MAINSIGNALIN(wavesetstepper_tilde_class, t_wavesetstepper_tilde, x_f);
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_dsp,
 		  gensym("dsp"), A_CANT, 0);
-  class_addmethod(wavesetplayer_tilde_class, (t_method)wavesetplayer_tilde_set,
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_set,
 		  gensym("set"), A_GIMME, 0);
-  class_addmethod(wavesetplayer_tilde_class, (t_method)wavesetplayer_tilde_print,
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_print,
 		  gensym("print"), A_GIMME, 0);
-  class_addmethod(wavesetplayer_tilde_class, (t_method)wavesetplayer_tilde_size,
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_size,
 		  gensym("size"), A_GIMME, 0);
 
 }

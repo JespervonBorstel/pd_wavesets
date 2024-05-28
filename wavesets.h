@@ -10,6 +10,7 @@ typedef struct {
   int size;
 } t_waveset;
 
+
 typedef struct _wavesetplayer_tilde
 {
   t_object x_obj;
@@ -24,7 +25,40 @@ typedef struct _wavesetplayer_tilde
 
 } t_wavesetplayer_tilde;
 
-void free_wavesets(t_wavesetplayer_tilde* x)
+
+typedef struct _wavesetstepper_tilde
+{
+  t_object x_obj;
+  t_arrayvec x_v;
+  
+  t_float x_f;
+  t_float step;
+  t_float step_c;
+  /*
+    how many wavesets are playes until the current
+    waveset is reset to the value in the first inlet
+  */
+  t_float delta;
+  t_float delta_c;
+
+  int num_wavesets;
+  t_waveset* waveset_array;
+  int current_waveset;
+  int current_index;
+
+  t_inlet* step_in, *delta_in;
+  t_outlet* x_out, *f_out, *trig_out;
+
+} t_wavesetstepper_tilde;
+
+
+void free_wavesets_player(t_wavesetplayer_tilde* x)
 {
   freebytes(x->waveset_array, (x->num_wavesets) * sizeof(t_waveset));
 }
+
+void free_wavesets_stepper(t_wavesetstepper_tilde* x)
+{
+  freebytes(x->waveset_array, (x->num_wavesets) * sizeof(t_waveset));
+}
+
