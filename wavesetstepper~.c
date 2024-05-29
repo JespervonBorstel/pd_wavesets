@@ -5,7 +5,7 @@
   wavesetstepper: wavesetplayer with additional Features
      - reads a certain amount of wavesets from an array by increment starting from the waveset
        specified by the index given in the first inlet.
-     - waveset omission added later
+     - waveset omission
 
  */
 
@@ -26,13 +26,20 @@ void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
   x->current_index = x->waveset_array[0].start_index;
   
   x->x_f = 0;
+  
   x->step = 0;
   x->step_c = 0;
+  
   x->delta = 1;
   x->delta_c = 0;
-
+  
+  x->o_fac = 0;
+  x->o_fac_c = x->o_fac;
+  x->is_omitted = 0;
+  
   x->step_in = floatinlet_new(&x->x_obj, &x->step);
   x->delta_in = floatinlet_new(&x->x_obj, &x->delta);
+  x->o_fac_in = floatinlet_new(&x->x_obj, &x->o_fac);
   
   x->x_out = outlet_new(&x->x_obj, &s_signal);
   x->f_out = outlet_new(&x->x_obj, &s_float);
@@ -52,6 +59,10 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   t_waveset cur_waveset = x->waveset_array[x->current_waveset];
   int index = x->current_index;
   int num_wavesets = x->num_wavesets;
+
+  int is_omitted = x->is_omitted;
+  t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac;
+  t_float o_fac_c = x->o_fac_c;
   
   if (!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0) || x->num_wavesets == 0)
     goto zero;
@@ -71,6 +82,15 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       }
 
       waveset_index = in[i] + floor(x->step_c);
+
+      // omission algorithm
+      is_omitted = 0;
+      o_fac_c += o_fac;
+      if (o_fac_c > 1) {
+        is_omitted = 1;
+	o_fac_c = o_fac_c - 1;
+      }
+      
       // clip the waveset_index
       waveset_index = (waveset_index >= num_wavesets) ? num_wavesets - 1 : waveset_index;
       waveset_index = (waveset_index < 0) ? 0 : waveset_index;
@@ -79,10 +99,12 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       x->current_waveset = waveset_index;
       index = cur_waveset.start_index;
     }
-    *out++ = buf[index].w_float;
+    *out++ = buf[index].w_float * is_omitted;
     index++;
   }
   x->current_index = index;
+  x->o_fac_c = o_fac_c;
+  x->is_omitted = is_omitted;
   return (w+6);
   
  zero:
@@ -166,5 +188,4 @@ void wavesetstepper_tilde_setup(void)
 		  gensym("print"), A_GIMME, 0);
   class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_size,
 		  gensym("size"), A_GIMME, 0);
-
 }
