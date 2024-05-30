@@ -6,7 +6,6 @@
      - reads a certain amount of wavesets from an array by increment starting from the waveset
        specified by the index given in the first inlet.
      - waveset omission
-
  */
 
 static t_class *wavesetstepper_tilde_class;
@@ -14,16 +13,24 @@ static t_class *wavesetstepper_tilde_class;
 void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
 {
   t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)pd_new(wavesetstepper_tilde_class);
+
   arrayvec_init(&x->x_v, x, argc, argv);
-  arrayvec_testvec(&x->x_v);
-  
   t_word* buf;
   int maxindex;
-  if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0))
-    pd_error(x, "wavesetstepper~: couldn't read array");
-  analyse_wavesets_stepper(x, buf, maxindex);
-  x->current_waveset = 0;
-  x->current_index = x->waveset_array[0].start_index;
+  
+  if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 1)) {
+    pd_error(x, "wavesetstepper~: unable to read array");
+    x->waveset_array = NULL;
+    x->num_wavesets = 0;
+    x->current_waveset = 0;
+    x->current_index = 0;
+  }
+  
+  else {
+    analyse_wavesets_stepper(x, buf, maxindex);
+    x->current_waveset = 0;
+    x->current_index = x->waveset_array[0].start_index;
+  }
   
   x->x_f = 0;
   
@@ -33,7 +40,7 @@ void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
   x->delta = 1;
   x->delta_c = 0;
   
-  x->o_fac = 0;
+  x->o_fac = 1;
   x->o_fac_c = x->o_fac;
   x->is_omitted = 0;
   
@@ -44,6 +51,7 @@ void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
   x->x_out = outlet_new(&x->x_obj, &s_signal);
   x->f_out = outlet_new(&x->x_obj, &s_float);
   x->trig_out = outlet_new(&x->x_obj, &s_signal);
+  
   return (x);
 }
 
@@ -145,8 +153,8 @@ void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s,
     int maxindex;
     t_word* buf;
     
-    if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0))
-      pd_error(x, "wavesetstepper~: couldn't read array");
+    if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 1))
+      pd_error(x, "wavesetstepper~: unable to read array");
     analyse_wavesets_stepper(x, buf, maxindex);
     x->current_waveset = 0;
     x->current_index = 0;
@@ -154,8 +162,9 @@ void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s,
 
 void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
 {
-     dsp_add(wavesetstepper_tilde_perform, 5, x,
-	     sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[0]->s_n);
+  arrayvec_testvec(&x->x_v);  
+  dsp_add(wavesetstepper_tilde_perform, 5, x,
+	  sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[0]->s_n);
 }
 
 void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
