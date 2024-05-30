@@ -63,8 +63,12 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   t_sample *trig_out = (t_sample *)(w[4]);
   int n = (int)(w[5]), i, maxindex;
   t_word *buf;
+
+  // safety in case no waveset_array exists
+  t_waveset* dummy = (t_waveset *)getbytes(sizeof(t_waveset));
+  t_waveset cur_waveset = (x->waveset_array == NULL) ? (*dummy) : x->waveset_array[x->current_waveset];
+  freebytes(dummy, sizeof(t_waveset));
   
-  t_waveset cur_waveset = x->waveset_array[x->current_waveset];
   int index = x->current_index;
   int num_wavesets = x->num_wavesets;
 
@@ -72,7 +76,9 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac;
   t_float o_fac_c = x->o_fac_c;
   
-  if (!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0) || x->num_wavesets == 0)
+  if (!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0)
+      || x->num_wavesets == 0
+      || x->waveset_array == NULL)
     goto zero;
   maxindex -= 1;
   
