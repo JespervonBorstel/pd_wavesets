@@ -9,7 +9,6 @@ void *wavesetplayer_tilde_new(t_symbol *s, int argc, t_atom *argv)
 {
   t_wavesetplayer_tilde *x = (t_wavesetplayer_tilde *)pd_new(wavesetplayer_tilde_class);
   arrayvec_init(&x->x_v, x, argc, argv);
-  arrayvec_testvec(&x->x_v);
   
   t_word* buf;
   int maxindex;
@@ -29,7 +28,7 @@ void *wavesetplayer_tilde_new(t_symbol *s, int argc, t_atom *argv)
 t_int *wavesetplayer_tilde_perform(t_int *w)
 {
   t_wavesetplayer_tilde *x = (t_wavesetplayer_tilde *)(w[1]);
-  t_sample *in = (t_sample *)(w[2]);
+  const t_sample *in = (t_sample *)(w[2]);
   t_sample *out = (t_sample *)(w[3]);
   t_sample *trig_out = (t_sample *)(w[4]);
   int n = (int)(w[5]), i, maxindex;

@@ -9,7 +9,7 @@ lib.name = pd_waveset
 class.sources = wavesetplayer~.c; wavesetstepper~.c
 
 # all extra files to be included in binary distribution of the library
-datafiles =
+datafiles = wavesetstepper~-help.pd
 
 PDINCLUDEDIR =/usr/include
 

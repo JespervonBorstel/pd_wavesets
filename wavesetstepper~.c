@@ -58,16 +58,17 @@ void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
 t_int *wavesetstepper_tilde_perform(t_int *w)
 {
   t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)(w[1]);
-  t_sample *in = (t_sample *)(w[2]);
+  const t_sample *in = (t_sample *)(w[2]);
   t_sample *out = (t_sample *)(w[3]);
   t_sample *trig_out = (t_sample *)(w[4]);
   int n = (int)(w[5]), i, maxindex;
   t_word *buf;
+  const t_waveset* waveset_array = x->waveset_array;
 
   // safety in case no waveset_array exists
-  t_waveset* dummy = (t_waveset *)getbytes(sizeof(t_waveset));
-  t_waveset cur_waveset = (x->waveset_array == NULL) ? (*dummy) : x->waveset_array[x->current_waveset];
-  freebytes(dummy, sizeof(t_waveset));
+  t_waveset cur_waveset;
+  if (x->waveset_array)
+    cur_waveset = waveset_array[x->current_waveset];
   
   int index = x->current_index;
   int num_wavesets = x->num_wavesets;
@@ -78,7 +79,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   
   if (!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0)
       || x->num_wavesets == 0
-      || x->waveset_array == NULL)
+      || !waveset_array)
     goto zero;
   maxindex -= 1;
   
