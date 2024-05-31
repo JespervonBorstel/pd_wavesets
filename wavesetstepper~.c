@@ -58,7 +58,7 @@ void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
 t_int *wavesetstepper_tilde_perform(t_int *w)
 {
   t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)(w[1]);
-  const t_sample *in = (t_sample *)(w[2]);
+  t_sample *in = (t_sample *)(w[2]);
   t_sample *out = (t_sample *)(w[3]);
   t_sample *trig_out = (t_sample *)(w[4]);
   int n = (int)(w[5]), i, maxindex;
@@ -84,14 +84,18 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   maxindex -= 1;
   
   for (i = 0; i < n; i++) {
-    trig_out[i] = (index == cur_waveset.end_index && x->delta_c > x->delta) ? 1 : 0;
+    trig_out[i] = 0;
     // in case playing a waveset is finished, a new waveset starts playing
     if(index > cur_waveset.end_index || index > maxindex) {
+      
       x->step_c += x->step;
       x->delta_c += 1;
       int waveset_index;
       
       if(x->delta_c >= x->delta) {
+
+	// trigger signal if waveset index is reset
+	trig_out[i] = 1;
 	x->step_c = 0;
 	x->delta_c = 0;
       }
@@ -110,7 +114,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       waveset_index = (waveset_index >= num_wavesets) ? num_wavesets - 1 : waveset_index;
       waveset_index = (waveset_index < 0) ? 0 : waveset_index;
       
-      cur_waveset = x->waveset_array[waveset_index];
+      cur_waveset = waveset_array[waveset_index];
       x->current_waveset = waveset_index;
       index = cur_waveset.start_index;
     }
