@@ -12,11 +12,19 @@ void *wavesetplayer_tilde_new(t_symbol *s, int argc, t_atom *argv)
   
   t_word* buf;
   int maxindex;
-  if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0))
+  if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0)) {
     pd_error(x, "wavesetplayer~: couldn't read array");
-  analyse_wavesets(x, buf, maxindex);
-  x->current_waveset = 0;
-  x->current_index = x->waveset_array[0].start_index;
+    x->waveset_array = NULL;
+    x->num_wavesets = 0;
+    x->current_waveset = 0;
+    x->current_index = 0;
+  }
+  
+  else{
+    analyse_wavesets(x, buf, maxindex);
+    x->current_waveset = 0;
+    x->current_index = x->waveset_array[0].start_index;
+  }
   
   x->x_f = 0;
   x->x_out = outlet_new(&x->x_obj, &s_signal);
@@ -33,12 +41,19 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
   t_sample *trig_out = (t_sample *)(w[4]);
   int n = (int)(w[5]), i, maxindex;
   t_word *buf;
-  
-  t_waveset cur_waveset = x->waveset_array[x->current_waveset];
+  const t_waveset* waveset_array = x->waveset_array;
+    
+  // safety in case no waveset_array exists
+  t_waveset cur_waveset;
+  if (x->waveset_array)
+    cur_waveset = waveset_array[x->current_waveset];
+
   int index = x->current_index;
   int num_wavesets = x->num_wavesets;
   
-  if (!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0) || x->num_wavesets == 0)
+  if (!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0)
+      || x->num_wavesets == 0
+      || !waveset_array)
     goto zero;
   maxindex -= 1;
   

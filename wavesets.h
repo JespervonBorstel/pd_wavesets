@@ -18,11 +18,12 @@ typedef struct _wavesetplayer_tilde
   t_float x_f;
   int num_wavesets;
   t_waveset* waveset_array;
+  // index of the waveset being played in the waveset_array
   int current_waveset;
+  // index of the currently played sample
   int current_index;
-
   t_outlet* x_out, *f_out, *trig_out;
-
+  
 } t_wavesetplayer_tilde;
 
 
@@ -48,7 +49,9 @@ typedef struct _wavesetstepper_tilde
   
   int num_wavesets;
   t_waveset* waveset_array;
+  // index of the waveset being played in the waveset_array
   int current_waveset;
+  // index of the currently played sample
   int current_index;
 
   t_inlet* step_in, *delta_in, *o_fac_in;
