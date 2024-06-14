@@ -6,7 +6,7 @@
 lib.name = pd_waveset
 
 # input source file (class name == source file basename)
-class.sources = wavesetplayer~.c; wavesetstepper~.c
+class.sources = src/wavesetplayer~.c; src/wavesetstepper~.c
 
 # all extra files to be included in binary distribution of the library
 datafiles = wavesetstepper~-help.pd
