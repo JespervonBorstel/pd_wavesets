@@ -1,8 +1,5 @@
 #include <m_pd.h>
 #include <puredata/g_canvas.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 
 typedef struct _dsparray
 {
@@ -18,6 +15,7 @@ typedef struct _arrayvec
     t_dsparray *v_vec;
 } t_arrayvec;
 
+    /* LATER consider exporting this and using it for tabosc4~ too */
 static int dsparray_get_array(t_dsparray *d, int *npoints, t_word **vec,
     int recover)
 {
@@ -86,7 +84,6 @@ static void arrayvec_set(t_arrayvec *v, int argc, t_atom *argv)
     if (pd_getdspstate())
         arrayvec_testvec(v);
 }
-
 
 static void arrayvec_init(t_arrayvec *v, void *x, int rawargc, t_atom *rawargv)
 {
