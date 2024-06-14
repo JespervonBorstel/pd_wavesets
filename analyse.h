@@ -135,6 +135,39 @@ void set_waveset_sizes_stepper (t_wavesetstepper_tilde* x)
   }
 }
 
+// analysing for the filtering data
+// returns an array of size 2 with the size of the smallest and biggest waveset 
+void get_extreme_wavesets(t_waveset* waveset_array, int num_wavesets, int* result)
+{
+  int smallest = waveset_array[0].size;
+  int biggest = waveset_array[0].size;
+  for(int i = 1; i < num_wavesets; i++) {
+    int size = waveset_array[i].size;
+    smallest = size < smallest ? size : smallest;
+    biggest = size > biggest ? size : biggest;
+  }
+  result[0] = smallest;
+  result[1] = biggest;
+}
+
+void set_waveset_filt(t_waveset* waveset_array, int num_wavesets)
+{
+  int* result = (int*)getbytes(2 * sizeof(int));
+  get_extreme_wavesets(waveset_array, num_wavesets, result);
+
+  t_float smallest = result[0];
+  t_float biggest = result[1];
+  post("biggest: %d\nsmallest: %d\n", biggest, smallest);
+  t_float delta = biggest - smallest;
+  for(int i = 0; i < num_wavesets; i++) {
+    t_waveset *waveset = &waveset_array[i];
+    t_float size = waveset->size;
+    waveset->filt = delta == 0 ? 0 : (size - smallest) / delta;
+    post("filter value: %f\n", waveset->filt);
+  }
+  freebytes(result, 2 * sizeof(int));
+}
+
 void analyse_wavesets_stepper (t_wavesetstepper_tilde* x, t_word* buf, int maxindex)
 {
   int num_zerocr = count_zerocr(buf, maxindex);
@@ -152,5 +185,7 @@ void analyse_wavesets_stepper (t_wavesetstepper_tilde* x, t_word* buf, int maxin
   }
   
   set_waveset_sizes_stepper(x);
+  set_waveset_filt(waveset_array, x->num_wavesets);
+  
   freebytes(zerocr_arr, num_zerocr * sizeof(int));
 }

@@ -42,11 +42,16 @@ void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
   
   x->o_fac = 1;
   x->o_fac_c = x->o_fac;
-  x->is_omitted = 0;
+  x->is_omitted = 1;
+
+  x->filt_1 = 0;
+  x->filt_2 = 1;
   
   x->step_in = floatinlet_new(&x->x_obj, &x->step);
   x->delta_in = floatinlet_new(&x->x_obj, &x->delta);
   x->o_fac_in = floatinlet_new(&x->x_obj, &x->o_fac);
+  x->filt1_in = floatinlet_new(&x->x_obj, &x->filt_1);
+  x->filt2_in = floatinlet_new(&x->x_obj, &x->filt_2);
   
   x->x_out = outlet_new(&x->x_obj, &s_signal);
   x->f_out = outlet_new(&x->x_obj, &s_float);
@@ -55,15 +60,57 @@ void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
   return (x);
 }
 
+/* function for returning the index of the nth next waveset within Filterrange
+   nth is is the floor value of the step_counter
+   should work circular on the waveset-array wrapping around at the end
+   filtering should act as if the array wavesets out of
+   range don't exist
+   return -1 if no such waveset exists
+*/
+
+int get_filtered_waveset_index (t_float upper_filt, t_float lower_filt, t_float step_c,
+				t_sample in_val, const t_waveset* waveset_array, int num_wavesets)
+{
+  in_val = (int)in_val;
+  step_c = (int)step_c;
+  int matching_wavesets = 1;
+  /*  - the while loop is needed in case a matching waveset was found
+        but step_c didn`t reach zero in one loop over the waveset array */
+  while(matching_wavesets) {
+    matching_wavesets = 0;
+    for(int i = in_val; i < (in_val + num_wavesets); i++) {
+      int true_index = i % num_wavesets;
+      t_float float_val = waveset_array[true_index].filt;
+      if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c == 0)) {
+	return true_index;
+      }
+      if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c > 0)) {
+	step_c -= 1;
+        matching_wavesets += 1;
+      }
+    }
+    /* shortens the loop to avoid unnessesary iteration
+       so that the while loop while take two iteratons max */
+    if(matching_wavesets)
+      step_c = (int)step_c % matching_wavesets;
+  }
+  return -1;
+}
+
 t_int *wavesetstepper_tilde_perform(t_int *w)
 {
   t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)(w[1]);
-  t_sample *in = (t_sample *)(w[2]);
+  const t_sample *in = (t_sample *)(w[2]);
   t_sample *out = (t_sample *)(w[3]);
   t_sample *trig_out = (t_sample *)(w[4]);
   int n = (int)(w[5]), i, maxindex;
   t_word *buf;
-  const t_waveset* waveset_array = x->waveset_array;
+  const t_waveset *waveset_array = x->waveset_array;
+
+  t_float filt1 = x->filt_1;
+  t_float filt2 = x->filt_2;
+  t_float upper_filt = filt1 >= filt2 ? filt1 : filt2;
+  t_float lower_filt = filt1 <= filt2 ? filt1 : filt2;
 
   // safety in case no waveset_array exists
   t_waveset cur_waveset;
@@ -100,8 +147,6 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
 	x->delta_c = 0;
       }
 
-      waveset_index = in[i] + floor(x->step_c);
-
       // omission algorithm
       is_omitted = 0;
       o_fac_c += o_fac;
@@ -109,10 +154,16 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
         is_omitted = 1;
 	o_fac_c = o_fac_c - 1;
       }
-      
-      // clip the waveset_index
-      waveset_index = (waveset_index >= num_wavesets) ? num_wavesets - 1 : waveset_index;
-      waveset_index = (waveset_index < 0) ? 0 : waveset_index;
+
+      // filtering
+      waveset_index = get_filtered_waveset_index(upper_filt, lower_filt, x->step_c,
+						 in[i], waveset_array, num_wavesets);
+
+      // check if a waveset within filter range has been found
+      if(waveset_index < 0) {
+	waveset_index = in[i];
+	is_omitted = 0;
+      }
       
       cur_waveset = waveset_array[waveset_index];
       x->current_waveset = waveset_index;
@@ -134,7 +185,6 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   return (w+6);
 }
 
-
 void wavesetstepper_tilde_print(t_wavesetstepper_tilde* x)
 {
   if(x->num_wavesets == 0) {
@@ -147,7 +197,8 @@ void wavesetstepper_tilde_print(t_wavesetstepper_tilde* x)
       post("i : %d", i);
       post("size : %d", waveset.size);
       post("start : %d", waveset.start_index);
-      post("end : %d\n", waveset.end_index);
+      post("end : %d", waveset.end_index);
+      post("filter value: %f\n", waveset.filt);
     }
   }
 }
@@ -185,6 +236,9 @@ void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
 
     inlet_free(x->step_in);
     inlet_free(x->delta_in);
+    inlet_free(x->filt1_in);
+    inlet_free(x->filt2_in);
+
     outlet_free(x->x_out);
     outlet_free(x->f_out);
     outlet_free(x->trig_out);
