@@ -11,7 +11,7 @@ class.sources = wavesetplayer~.c; wavesetstepper~.c
 # all extra files to be included in binary distribution of the library
 datafiles = wavesetstepper~-help.pd
 
-PDINCLUDEDIR =/usr/include
+# PDINCLUDEDIR = /usr/include
 
 # include Makefile.pdlibbuilder from submodule directory 'pd-lib-builder'
 PDLIBBUILDER_DIR=./pd-lib-builder
