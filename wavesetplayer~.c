@@ -36,7 +36,7 @@ void *wavesetplayer_tilde_new(t_symbol *s, int argc, t_atom *argv)
 t_int *wavesetplayer_tilde_perform(t_int *w)
 {
   t_wavesetplayer_tilde *x = (t_wavesetplayer_tilde *)(w[1]);
-  const t_sample *in = (t_sample *)(w[2]);
+  t_sample *in = (t_sample *)(w[2]);
   t_sample *out = (t_sample *)(w[3]);
   t_sample *trig_out = (t_sample *)(w[4]);
   int n = (int)(w[5]), i, maxindex;

@@ -157,13 +157,13 @@ void set_waveset_filt(t_waveset* waveset_array, int num_wavesets)
 
   t_float smallest = result[0];
   t_float biggest = result[1];
-  post("biggest: %d\nsmallest: %d\n", biggest, smallest);
+  //post("biggest: %d\nsmallest: %d\n", biggest, smallest);
   t_float delta = biggest - smallest;
   for(int i = 0; i < num_wavesets; i++) {
     t_waveset *waveset = &waveset_array[i];
     t_float size = waveset->size;
     waveset->filt = delta == 0 ? 0 : (size - smallest) / delta;
-    post("filter value: %f\n", waveset->filt);
+    //post("filter value: %f\n", waveset->filt);
   }
   freebytes(result, 2 * sizeof(int));
 }
