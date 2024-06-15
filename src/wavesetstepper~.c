@@ -1,5 +1,6 @@
 #include "wavesets.h"
 #include "analyse.h"
+#include <math.h>
 
 /*
   wavesetstepper: wavesetplayer with additional Features
@@ -70,31 +71,59 @@ void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
    - needs adjustment for negative step values
 */
 
-int get_filtered_waveset_index (t_float upper_filt, t_float lower_filt, t_float step_c,
+// implementation of the positive mod
+int mod(int i, int n)
+{
+    return (i % n + n) % n;
+}
+
+int get_filtered_waveset_index (t_float upper_filt, t_float lower_filt, t_float step_c, t_float step,
 				t_sample in_val, const t_waveset* waveset_array, int num_wavesets)
 {
-  in_val = (int)in_val;
-  step_c = (int)step_c;
+  in_val = (int)floor(in_val);
+  step_c = (int)floor(step_c);
   int matching_wavesets = 1;
-  /*  - the while loop is needed in case a matching waveset was found
+
+  // iterates in the other direction if our step_increment is negative
+  if(step > 0) {
+    /*  - the while loop is needed in case a matching waveset was found
         but step_c didn`t reach zero in one loop over the waveset array */
-  while(matching_wavesets) {
-    matching_wavesets = 0;
-    for(int i = in_val; i < (in_val + num_wavesets); i++) {
-      int true_index = i % num_wavesets;
-      t_float float_val = waveset_array[true_index].filt;
-      if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c == 0)) {
-	return true_index;
+    while(matching_wavesets) {
+      matching_wavesets = 0;
+      for(int i = in_val; i < (in_val + num_wavesets); i++) {
+	int true_index = mod(i, num_wavesets);
+	t_float float_val = waveset_array[true_index].filt;
+	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c <= 0)) {
+	  return true_index;
+	}
+	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c > 0)) {
+	  step_c -= 1;
+	  matching_wavesets += 1;
+	}
       }
-      if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c > 0)) {
-	step_c -= 1;
-        matching_wavesets += 1;
-      }
+      /* shortens the loop to avoid unnessesary iteration
+	 so that the while loop while take two iteratons max */
+      if(matching_wavesets)
+	step_c = mod((int)step_c, matching_wavesets);
     }
-    /* shortens the loop to avoid unnessesary iteration
-       so that the while loop while take two iteratons max */
-    if(matching_wavesets)
-      step_c = (int)step_c % matching_wavesets;
+  }
+  else {
+    while(matching_wavesets) {
+      matching_wavesets = 0;
+      for(int i = in_val; i > (in_val - num_wavesets); i--) {
+	int true_index = mod(i, num_wavesets);
+	t_float float_val = waveset_array[true_index].filt;
+	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c >= 0)) {
+	  return true_index;
+	}
+	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c < 0)) {
+	  step_c += 1;
+	  matching_wavesets += 1;
+	}
+      }
+      if(matching_wavesets)
+	step_c = mod((int)step_c, (-1 * matching_wavesets));
+    }
   }
   return -1;
 }
@@ -156,9 +185,9 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
         is_omitted = 1;
 	o_fac_c = o_fac_c - 1;
       }
-
+      
       // filtering
-      waveset_index = get_filtered_waveset_index(upper_filt, lower_filt, x->step_c,
+      waveset_index = get_filtered_waveset_index(upper_filt, lower_filt, x->step_c, x->step,
 						 in[i], waveset_array, num_wavesets);
 
       // check if a waveset within filter range has been found
