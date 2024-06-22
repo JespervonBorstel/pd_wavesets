@@ -1,6 +1,7 @@
 #include "wavesets.h"
 #include "analyse.h"
 #include <math.h>
+#include "sort.h"
 
 /*
   wavesetstepper: wavesetplayer with additional Features
@@ -11,57 +12,8 @@
 
 static t_class *wavesetstepper_tilde_class;
 
-void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
-{
-  t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)pd_new(wavesetstepper_tilde_class);
-
-  arrayvec_init(&x->x_v, x, argc, argv);
-  t_word* buf;
-  int maxindex;
-  
-  if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 1)) {
-    pd_error(x, "wavesetstepper~: unable to read array");
-    x->waveset_array = NULL;
-    x->num_wavesets = 0;
-    x->current_waveset = 0;
-    x->current_index = 0;
-  }
-  
-  else {
-    analyse_wavesets_stepper(x, buf, maxindex);
-    x->current_waveset = 0;
-    x->current_index = x->waveset_array[0].start_index;
-  }
-  
-  x->x_f = 0;
-  
-  x->step = 0;
-  x->step_c = 0;
-  
-  x->delta = 1;
-  x->delta_c = 0;
-  
-  x->o_fac = 1;
-  x->o_fac_c = x->o_fac;
-  x->is_omitted = 1;
-
-  x->filt_1 = 0;
-  x->filt_2 = 1;
-  
-  x->step_in = floatinlet_new(&x->x_obj, &x->step);
-  x->delta_in = floatinlet_new(&x->x_obj, &x->delta);
-  x->o_fac_in = floatinlet_new(&x->x_obj, &x->o_fac);
-  x->filt1_in = floatinlet_new(&x->x_obj, &x->filt_1);
-  x->filt2_in = floatinlet_new(&x->x_obj, &x->filt_2);
-  
-  x->x_out = outlet_new(&x->x_obj, &s_signal);
-  x->f_out = outlet_new(&x->x_obj, &s_float);
-  x->trig_out = outlet_new(&x->x_obj, &s_signal);
-  
-  return (x);
-}
-
-/* function for returning the index of the nth next waveset within Filterrange
+/*
+   function for returning the index of the nth next waveset within Filterrange
    nth is is the floor value of the step_counter
    should work circular on the waveset-array wrapping around at the end
    filtering should act as if the array wavesets out of
@@ -78,7 +30,8 @@ int mod(int i, int n)
 }
 
 int get_filtered_waveset_index (t_float upper_filt, t_float lower_filt, t_float step_c, t_float step,
-				t_sample in_val, const t_waveset* waveset_array, int num_wavesets)
+				t_sample in_val, const t_waveset* waveset_array, int num_wavesets,
+				const int sorted_lookup[])
 {
   in_val = (int)floor(in_val);
   step_c = (int)floor(step_c);
@@ -91,7 +44,7 @@ int get_filtered_waveset_index (t_float upper_filt, t_float lower_filt, t_float 
     while(matching_wavesets) {
       matching_wavesets = 0;
       for(int i = in_val; i < (in_val + num_wavesets); i++) {
-	int true_index = mod(i, num_wavesets);
+	int true_index = sorted_lookup[mod(i, num_wavesets)];
 	t_float float_val = waveset_array[true_index].filt;
 	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c <= 0)) {
 	  return true_index;
@@ -104,14 +57,14 @@ int get_filtered_waveset_index (t_float upper_filt, t_float lower_filt, t_float 
       /* shortens the loop to avoid unnessesary iteration
 	 so that the while loop while take two iteratons max */
       if(matching_wavesets)
-	step_c = mod((int)step_c, matching_wavesets);
+	step_c = mod(step_c, matching_wavesets);
     }
   }
   else {
     while(matching_wavesets) {
       matching_wavesets = 0;
       for(int i = in_val; i > (in_val - num_wavesets); i--) {
-	int true_index = mod(i, num_wavesets);
+	int true_index = sorted_lookup[mod(i, num_wavesets)];
 	t_float float_val = waveset_array[true_index].filt;
 	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c >= 0)) {
 	  return true_index;
@@ -122,7 +75,7 @@ int get_filtered_waveset_index (t_float upper_filt, t_float lower_filt, t_float 
 	}
       }
       if(matching_wavesets)
-	step_c = mod((int)step_c, (-1 * matching_wavesets));
+	step_c = mod(step_c, (-1 * matching_wavesets));
     }
   }
   return -1;
@@ -188,7 +141,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       
       // filtering
       waveset_index = get_filtered_waveset_index(upper_filt, lower_filt, x->step_c, x->step,
-						 in[i], waveset_array, num_wavesets);
+						 in[i], waveset_array, num_wavesets, x->sorted_lookup);
 
       // check if a waveset within filter range has been found
       if(waveset_index < 0) {
@@ -214,6 +167,29 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
     *trig_out++ = 0;
   } 
   return (w+6);
+}
+
+/* Methods for sorting and unsorting the wavesettable */
+
+void wavesetstepper_tilde_reset(t_wavesetstepper_tilde* x)
+{
+  if(x->sorted) {
+    int* sorted_lookup = x->sorted_lookup;
+    for(int i = 0; i < x->num_wavesets; i++) {
+      sorted_lookup[i] = i;
+    }
+    x->sorted = 0;
+  }
+}
+
+void wavesetstepper_tilde_sort(t_wavesetstepper_tilde* x)
+{
+  if(!x->sorted) {
+    x->sorted = 1;
+    wavesetstepper_tilde_reset(x);
+    qsort_wavesets(x->sorted_lookup, 0, x->num_wavesets - 1, x->waveset_array);
+    x->sorted = 1;
+  }
 }
 
 void wavesetstepper_tilde_print(t_wavesetstepper_tilde* x)
@@ -248,9 +224,20 @@ void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s,
     
     if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 1))
       pd_error(x, "wavesetstepper~: unable to read array");
+    freebytes(x->sorted_lookup, x->num_wavesets * sizeof(int));
     analyse_wavesets_stepper(x, buf, maxindex);
     x->current_waveset = 0;
     x->current_index = 0;
+    x->sorted_lookup = (int*)getbytes(x->num_wavesets * sizeof(int));
+    
+    if(x->sorted) {
+      x->sorted = 0;
+      wavesetstepper_tilde_sort(x);
+    }
+    else {
+      x->sorted = 1;
+      wavesetstepper_tilde_reset(x);
+    }
 }
 
 void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
@@ -275,6 +262,61 @@ void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
     outlet_free(x->trig_out);
 }
 
+void *wavesetstepper_tilde_new(t_symbol *s, int argc, t_atom *argv)
+{
+  t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)pd_new(wavesetstepper_tilde_class);
+
+  arrayvec_init(&x->x_v, x, argc, argv);
+  t_word* buf;
+  int maxindex;
+  
+  if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 1)) {
+    pd_error(x, "wavesetstepper~: unable to read array");
+    x->waveset_array = NULL;
+    x->num_wavesets = 0;
+    x->current_waveset = 0;
+    x->current_index = 0;
+  }
+  
+  else {
+    analyse_wavesets_stepper(x, buf, maxindex);
+    x->current_waveset = 0;
+    x->current_index = x->waveset_array[0].start_index;
+  }
+  
+  x->x_f = 0;
+  
+  x->step = 0;
+  x->step_c = 0;
+  
+  x->delta = 1;
+  x->delta_c = 0;
+  
+  x->o_fac = 1;
+  x->o_fac_c = x->o_fac;
+  x->is_omitted = 1;
+
+  x->filt_1 = 0;
+  x->filt_2 = 1;
+
+  x->sorted = 1;
+  x->sorted_lookup = (int*)getbytes(x->num_wavesets * sizeof(int));
+  wavesetstepper_tilde_reset(x);
+  
+  x->step_in = floatinlet_new(&x->x_obj, &x->step);
+  x->delta_in = floatinlet_new(&x->x_obj, &x->delta);
+  x->o_fac_in = floatinlet_new(&x->x_obj, &x->o_fac);
+  x->filt1_in = floatinlet_new(&x->x_obj, &x->filt_1);
+  x->filt2_in = floatinlet_new(&x->x_obj, &x->filt_2);
+  
+  x->x_out = outlet_new(&x->x_obj, &s_signal);
+  x->f_out = outlet_new(&x->x_obj, &s_float);
+  x->trig_out = outlet_new(&x->x_obj, &s_signal);
+  
+  return (x);
+}
+
+
 void wavesetstepper_tilde_setup(void)
 {
   wavesetstepper_tilde_class = class_new(gensym("wavesetstepper~"),
@@ -293,4 +335,8 @@ void wavesetstepper_tilde_setup(void)
 		  gensym("print"), A_GIMME, 0);
   class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_size,
 		  gensym("size"), A_GIMME, 0);
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_sort,
+		  gensym("sort"), A_GIMME, 0);
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_reset,
+		  gensym("reset"), A_GIMME, 0);
 }

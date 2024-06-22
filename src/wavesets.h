@@ -56,6 +56,10 @@ typedef struct _wavesetstepper_tilde
   // for wavesetfiltering
   t_float filt_1;
   t_float filt_2;
+
+  //waveset_sorting in der sort_methode
+  int sorted;
+  int* sorted_lookup;
   
   int num_wavesets;
   t_waveset* waveset_array;
@@ -71,10 +75,11 @@ typedef struct _wavesetstepper_tilde
 
 void free_wavesets_player(t_wavesetplayer_tilde* x)
 {
-  freebytes(x->waveset_array, (x->num_wavesets) * sizeof(t_waveset));
+  freebytes(x->waveset_array, x->num_wavesets * sizeof(t_waveset));
 }
 
 void free_wavesets_stepper(t_wavesetstepper_tilde* x)
 {
-  freebytes(x->waveset_array, (x->num_wavesets) * sizeof(t_waveset));
+  freebytes(x->waveset_array, x->num_wavesets * sizeof(t_waveset));
+  freebytes(x->sorted_lookup, x->num_wavesets * sizeof(int));
 }
