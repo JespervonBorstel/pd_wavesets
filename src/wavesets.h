@@ -69,7 +69,7 @@ typedef struct _wavesetstepper_tilde
   int current_index;
   
   t_inlet* step_in, *delta_in, *o_fac_in, *filt1_in, *filt2_in;
-  t_outlet* x_out, *f_out, *trig_out;
+  t_outlet* x_out, *freq_out, *f_out, *trig_out;
 
 } t_wavesetstepper_tilde;
 
