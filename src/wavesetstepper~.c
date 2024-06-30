@@ -203,6 +203,7 @@ void wavesetstepper_tilde_sort(t_wavesetstepper_tilde* x)
 void wavesetstepper_tilde_bang(t_wavesetstepper_tilde* x)
 {
   x->step_c = 0;
+  x->delta_c = 0;
 }
 
 void wavesetstepper_tilde_print(t_wavesetstepper_tilde* x)
