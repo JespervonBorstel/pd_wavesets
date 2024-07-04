@@ -27,7 +27,7 @@ void *wavesetplayer_tilde_new(t_symbol *s, int argc, t_atom *argv)
   }
   
   else {
-    analyse_wavesets(x, buf, maxindex);
+    analyse_wavesets_player(x, buf, maxindex);
     x->current_waveset = 0;
     x->current_index = x->waveset_array[0].start_index;
   }
@@ -125,7 +125,7 @@ void wavesetplayer_tilde_set(t_wavesetplayer_tilde *x, t_symbol *s,
     
     if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 1))
       pd_error(x, "wavesetplayer~: unable to read array");
-    analyse_wavesets(x, buf, maxindex);
+    analyse_wavesets_player(x, buf, maxindex);
     x->current_waveset = 0;
     x->current_index = 0;
 }

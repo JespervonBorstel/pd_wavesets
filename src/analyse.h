@@ -56,7 +56,8 @@ int* get_zerocr_arr(t_word* buf, int maxindex, int num_zerocr)
   return zerocr_arr;
 }
 
-void set_num_waveset(t_wavesetplayer_tilde* x, int num_zerocr)
+
+void set_num_waveset(t_wavesetbuffer* x, int num_zerocr)
 {
   if(num_zerocr < 1)
     x->num_wavesets = 0;
@@ -64,70 +65,19 @@ void set_num_waveset(t_wavesetplayer_tilde* x, int num_zerocr)
   x->num_wavesets = num_zerocr - 1;
 }
 
-void init_waveset_array(t_wavesetplayer_tilde* x)
+void init_waveset_array(t_wavesetbuffer* x)
 {
   int num_wavesets = x->num_wavesets;
 
   if(num_wavesets == 0)
-    pd_error(x, "wavesetplayer~: wavesetarray empty");
+    pd_error(x, "wavesetbuffer: wavesetarray empty");
   t_waveset* waveset_array = (t_waveset*)getbytes(num_wavesets * sizeof(t_waveset));
   if(waveset_array == NULL)
-    pd_error(x, "wavesetplayer~: waveset allocation failed");
+    pd_error(x, "wavesetbuffer: waveset allocation failed");
   x->waveset_array = waveset_array;
 }
 
-void set_waveset_sizes (t_wavesetplayer_tilde* x)
-{
-  for(int i = 0; i < x->num_wavesets; i++) {
-    t_waveset* waveset = &x->waveset_array[i];
-    waveset->size = (waveset->end_index - waveset->start_index) + 1;
-  }
-}
-
-void analyse_wavesets (t_wavesetplayer_tilde* x, t_word* buf, int maxindex)
-{
-  int num_zerocr = count_zerocr(buf, maxindex);
-  int* zerocr_arr = get_zerocr_arr(buf, maxindex, num_zerocr);
-
-  set_num_waveset(x, num_zerocr);
-  init_waveset_array(x);
-
-  t_waveset* waveset_array = x->waveset_array;
-  
-  for(int i = 0; i < (num_zerocr - 1); i++) {
-    int j = i + 1;
-    waveset_array[i].start_index = zerocr_arr[i];
-    waveset_array[i].end_index = zerocr_arr[j] - 1;
-  }
-  
-  set_waveset_sizes(x);
-  freebytes(zerocr_arr, num_zerocr * sizeof(int));
-}
-
-
-// for wavesetstepper~
-
-void set_num_waveset_stepper(t_wavesetstepper_tilde* x, int num_zerocr)
-{
-  if(num_zerocr < 1)
-    x->num_wavesets = 0;
-  else
-  x->num_wavesets = num_zerocr - 1;
-}
-
-void init_waveset_array_stepper(t_wavesetstepper_tilde* x)
-{
-  int num_wavesets = x->num_wavesets;
-
-  if(num_wavesets == 0)
-    pd_error(x, "wavesetstepper~: wavesetarray empty");
-  t_waveset* waveset_array = (t_waveset*)getbytes(num_wavesets * sizeof(t_waveset));
-  if(waveset_array == NULL)
-    pd_error(x, "wavesetstepper~: waveset allocation failed");
-  x->waveset_array = waveset_array;
-}
-
-void set_waveset_sizes_stepper (t_wavesetstepper_tilde* x)
+void set_waveset_sizes (t_wavesetbuffer* x)
 {
   for(int i = 0; i < x->num_wavesets; i++) {
     t_waveset* waveset = &x->waveset_array[i];
@@ -168,13 +118,13 @@ void set_waveset_filt(t_waveset* waveset_array, int num_wavesets)
   freebytes(result, 2 * sizeof(int));
 }
 
-void analyse_wavesets_stepper (t_wavesetstepper_tilde* x, t_word* buf, int maxindex)
+void analyse_wavesets(t_wavesetbuffer *x, t_word* buf, int maxindex)
 {
   int num_zerocr = count_zerocr(buf, maxindex);
   int* zerocr_arr = get_zerocr_arr(buf, maxindex, num_zerocr);
 
-  set_num_waveset_stepper(x, num_zerocr);
-  init_waveset_array_stepper(x);
+  set_num_waveset(x, num_zerocr);
+  init_waveset_array(x);
 
   t_waveset* waveset_array = x->waveset_array;
   
@@ -184,7 +134,7 @@ void analyse_wavesets_stepper (t_wavesetstepper_tilde* x, t_word* buf, int maxin
     waveset_array[i].end_index = zerocr_arr[j] - 1;
   }
   
-  set_waveset_sizes_stepper(x);
+  set_waveset_sizes(x);
   set_waveset_filt(waveset_array, x->num_wavesets);
   
   freebytes(zerocr_arr, num_zerocr * sizeof(int));
