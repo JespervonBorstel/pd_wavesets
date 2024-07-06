@@ -20,58 +20,6 @@ t_class *wavesetstepper_tilde_class;
    - needs adjustment for negative step values
 */
 
-int get_filtered_waveset_index (t_float upper_filt, t_float lower_filt, t_float step_c, t_float step,
-				t_sample in_val, const t_waveset* waveset_array, int num_wavesets,
-				const int sorted_lookup[])
-{
-  in_val = (int)floor(in_val);
-  step_c = (int)floor(step_c);
-  int matching_wavesets = 1;
-
-  // iterates in the other direction if our step_increment is negative
-  if(step > 0) {
-    /*  - the while loop is needed in case a matching waveset was found
-        but step_c didn`t reach zero in one loop over the waveset array */
-    while(matching_wavesets) {
-      matching_wavesets = 0;
-      for(int i = in_val; i < (in_val + num_wavesets); i++) {
-	int true_index = sorted_lookup[mod(i, num_wavesets)];
-	t_float float_val = waveset_array[true_index].filt;
-	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c <= 0)) {
-	  return true_index;
-	}
-	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c > 0)) {
-	  step_c -= 1;
-	  matching_wavesets += 1;
-	}
-      }
-      /* shortens the loop to avoid unnessesary iteration
-	 so that the while loop while take two iteratons max */
-      if(matching_wavesets)
-	step_c = mod(step_c, matching_wavesets);
-    }
-  }
-  else {
-    while(matching_wavesets) {
-      matching_wavesets = 0;
-      for(int i = in_val; i > (in_val - num_wavesets); i--) {
-	int true_index = sorted_lookup[mod(i, num_wavesets)];
-	t_float float_val = waveset_array[true_index].filt;
-	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c >= 0)) {
-	  return true_index;
-	}
-	if ((float_val >= lower_filt) && (float_val <= upper_filt) && (step_c < 0)) {
-	  step_c += 1;
-	  matching_wavesets += 1;
-	}
-      }
-      if(matching_wavesets)
-	step_c = mod(step_c, (-1 * matching_wavesets));
-    }
-  }
-  return -1;
-}
-
 t_int *wavesetstepper_tilde_perform(t_int *w)
 {
   t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)(w[1]);
@@ -88,11 +36,11 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   maxindex = x->bufp->a_vec_length;
   const t_waveset *waveset_array = x->bufp->waveset_array;
 
-  t_float filt1 = x->filt_1;
-  t_float filt2 = x->filt_2;
-  t_float upper_filt = filt1 >= filt2 ? filt1 : filt2;
-  t_float lower_filt = filt1 <= filt2 ? filt1 : filt2;
+  int* filter_lookup = x->filter_lookup;
+  int lookup_size = x->lookup_size;
 
+  int* sorted_lookup = x->bufp->sorted_lookup;
+  
   float sr = sys_getsr();
   
   // safety in case no waveset_array exists
@@ -101,15 +49,14 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
     cur_waveset = waveset_array[x->current_waveset];
   
   int index = x->current_index;
-  int num_wavesets = x->bufp->num_wavesets;
 
   int is_omitted = x->is_omitted;
   t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac;
   t_float o_fac_c = x->o_fac_c;
   
   if (!buf
-      || num_wavesets == 0
-      || !waveset_array)
+      || !waveset_array
+      || !lookup_size)
     goto zero;
   maxindex -= 1;
 
@@ -141,15 +88,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       }
       
       // filtering
-      waveset_index = get_filtered_waveset_index(upper_filt, lower_filt, x->step_c, x->step,
-						 in[i], waveset_array, num_wavesets,
-						 x->bufp->sorted_lookup);
-
-      // check if a waveset within filter range has been found
-      if(waveset_index < 0) {
-	waveset_index = in[i];
-	is_omitted = 0;
-      }
+      waveset_index = sorted_lookup[filter_lookup[mod((in[i] + x->step_c), lookup_size)]];
       
       cur_waveset = waveset_array[waveset_index];
       freq = (1 / (t_sample)cur_waveset.size) * sr;
@@ -203,11 +142,67 @@ void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s)
   }
 }
 
+int is_in_filter_range(t_waveset waveset, t_float lower_filt, t_float upper_filt)
+{
+  int bool = 0;
+  if((waveset.filt >= lower_filt) && (waveset.filt <= upper_filt))
+    bool++;
+  return bool;
+}
+
+/* makes the filter_lookup array and saves its size int num_in_filter_range */
+int *make_filter_lookup(t_waveset* waveset_array, int num_wavesets, int* num_in_filter_range,
+			t_float lower_filt, t_float upper_filt)
+{
+  /* allocates a lookup array that has the same size as the wavesetarray
+     but is only indexed in the range that is set by this
+     function in the variable num_in_filter_range.
+     This is wasteful in terms of memory but efficient for the cpu
+     because we only need to iterate over the array once.
+     Might change this if it causes issues. */
+  int* filter_lookup = (int*)getbytes(num_wavesets * sizeof(int));
+  for(int i = 0; i < num_wavesets; i++) {
+    if(is_in_filter_range(waveset_array[i], lower_filt, upper_filt)) {
+      filter_lookup[*num_in_filter_range] = i;
+      (*num_in_filter_range)++;
+    }
+  }
+  return filter_lookup;
+}
+
+void wavesetstepper_tilde_filter(t_wavesetstepper_tilde *x, t_floatarg f1, t_floatarg f2)
+{
+  /* frees the lookup if it exists */
+  if(x->filter_lookup)
+    freebytes(x->filter_lookup, x->lookup_size * sizeof(int));
+  
+  t_waveset* waveset_array = x->bufp->waveset_array;
+  int num_wavesets = x->bufp->num_wavesets;
+
+  t_float upper_filt = f1 >= f2 ? f1 : f2;
+  t_float lower_filt = f1 <= f2 ? f1 : f2;
+
+  int num_in_filter_range = 0;
+  int* filter_lookup = make_filter_lookup(waveset_array, num_wavesets,
+					  &num_in_filter_range, lower_filt, upper_filt);
+  
+  x->filt_1 = lower_filt;
+  x->filt_2 = upper_filt;
+  x->filter_lookup = filter_lookup;
+  x->lookup_size = num_in_filter_range;
+  /*
+  post("lower_filt: %f\nupper_filt: %f\n", lower_filt, upper_filt);
+  for(int i = 0; i < num_in_filter_range; i++) {
+    post("i: %d -> index: %d -> filt %f\n", i, filter_lookup[i], waveset_array[filter_lookup[i]].filt);
+  }
+  */
+}
+
 /* safety needed in case that the bufferpointer points to a corrupted bufferobject */
 
 void buffer_still_there(t_wavesetstepper_tilde *x)
 {
-  t_wavesetbuffer *a = NULL;
+  t_wavesetbuffer *a;
   a = (t_wavesetbuffer *)pd_findbyclass(x->buffer_name, wavesetbuffer_class);
   if(a == NULL)
     x->bufp = NULL;
@@ -220,6 +215,13 @@ void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
 	  sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[3]->s_vec, sp[0]->s_n);
 }
 
+/* function that is called by wavesetbuffer if the buffer changes */
+
+void update_wavesetstepper_tilde(t_wavesetstepper_tilde *x)
+{
+  wavesetstepper_tilde_filter(x, x->filt_1, x->filt_2);
+}
+
 void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
 {
   if(x->bufp) {
@@ -227,10 +229,9 @@ void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
     rp.wavesetstepper = x;
     remove_from_reference_list(rp, wavesetstepper, x->bufp);
   }
+  freebytes(x->filter_lookup, x->lookup_size * sizeof(int));
   inlet_free(x->step_in);
   inlet_free(x->delta_in);
-  inlet_free(x->filt1_in);
-  inlet_free(x->filt2_in);
   
   outlet_free(x->x_out);
   outlet_free(x->freq_out);
@@ -273,12 +274,13 @@ void *wavesetstepper_tilde_new(t_symbol *s)
 
   x->filt_1 = 0;
   x->filt_2 = 1;
+  wavesetstepper_tilde_filter(x, 0, 1);
+
+  x->update_fun_pointer = &update_wavesetstepper_tilde;
   
   x->step_in = floatinlet_new(&x->x_obj, &x->step);
   x->delta_in = floatinlet_new(&x->x_obj, &x->delta);
   x->o_fac_in = floatinlet_new(&x->x_obj, &x->o_fac);
-  x->filt1_in = floatinlet_new(&x->x_obj, &x->filt_1);
-  x->filt2_in = floatinlet_new(&x->x_obj, &x->filt_2);
   
   x->x_out = outlet_new(&x->x_obj, &s_signal);
   x->freq_out = outlet_new(&x->x_obj, &s_signal);
@@ -303,4 +305,7 @@ void wavesetstepper_tilde_setup(void)
 		  gensym("dsp"), A_CANT, 0);
   class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_set,
 		  gensym("set"), A_DEFSYMBOL, 0);
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_filter,
+		  gensym("filter"), A_FLOAT, A_FLOAT, 0);
+
 }

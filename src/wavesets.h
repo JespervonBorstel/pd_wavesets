@@ -79,13 +79,16 @@ typedef struct _wavesetstepper_tilde
   t_float filt_1;
   t_float filt_2;
   int* filter_lookup;
-  
+  int lookup_size;
+
+  // store a function that is called by wavesetbuffer, when it changes
+  void (*update_fun_pointer)(struct _wavesetstepper_tilde*);
   // index of the waveset being played in the waveset_array
   int current_waveset;
   // index of the currently played sample
   int current_index;
   
-  t_inlet* step_in, *delta_in, *o_fac_in, *filt1_in, *filt2_in;
+  t_inlet* step_in, *delta_in, *o_fac_in;
   t_outlet* x_out, *freq_out, *trig_out;
 
 } t_wavesetstepper_tilde;
