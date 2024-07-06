@@ -4,3 +4,4 @@ tab_reference.c
 *.pd_linux
 *.c~
 *~
+src/filter.c

@@ -3,7 +3,9 @@
  */
 #include <m_pd.h>
 #include <puredata/g_canvas.h>
-//#include "tabread.h"
+
+typedef struct _node t_node;
+typedef struct _ref_list t_ref_list;
 
 typedef struct {
   int start_index;
@@ -31,6 +33,9 @@ typedef struct _wavesetbuffer
 
   int a_vec_length;
   t_word* a_vec;
+
+  // a pointer to the list of all dsp-objects referencing this object
+  t_ref_list *reference_listp;
   
   t_outlet* f_out;
   
@@ -71,9 +76,9 @@ typedef struct _wavesetstepper_tilde
   t_float o_fac_c;
   int is_omitted;
 
-  // for wavesetfiltering
   t_float filt_1;
   t_float filt_2;
+  int* filter_lookup;
   
   // index of the waveset being played in the waveset_array
   int current_waveset;

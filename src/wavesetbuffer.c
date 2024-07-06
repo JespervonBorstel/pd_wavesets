@@ -1,7 +1,7 @@
 #include "wavesets.h"
+#include "utils.h"
 #include "analyse.h"
 #include <math.h>
-#include "sort.h"
 
 /*
  * wavesetbuffer: object that stores and analyses soundfile arrays
@@ -11,9 +11,20 @@
  */
 
 /*
- * TODO: 1. create wavesetbuffer-object
- *       2. adjust wavesetstepper and wavesetplayer object to work with it
- *       Fixing the unbind error message when creating the object
+ * TODO: 1. create wavesetbuffer-object (done)
+ *       2. adjust wavesetstepper object to work with it (done)
+ *       3. Fixing the unbind error message when creating the object
+ *       4. Testing if wavesetstepper~ still works (done)
+ *       5. making wavesetplayer~ work with it
+ *       6. implementing wavesetfiltering in wavesetstepper at k-rate
+ *         - this will need a way of communicating between buffer and dsp object
+ *           in case the buffer is changed
+ *         - implementation:
+ *           - have a list of pointers to all dsp-objects referencing the buffer
+ *           - if the buffer is set, call an update-function that works on every dsp-object in the linked list
+ *           - if the dsp-object changes the buffer it references,
+ *             the buffer needs to remove the pointer out of the list, and add it to the new buffer (done)
+ *       7. cleaning up
  */
 
 t_class *wavesetbuffer_class;
@@ -22,11 +33,13 @@ void wavesetbuffer_free(t_wavesetbuffer *x)
 {
   freebytes(x->a_vec, x->a_vec_length * sizeof(t_word));
   freebytes(x->sorted_lookup, x->num_wavesets * sizeof(int));
+  free_ref_list(x->reference_listp);
   pd_unbind(&x->x_obj.ob_pd, x->buffer_name);
 }
 
 void wavesetbuffer_print(t_wavesetbuffer *x)
 {
+  /*
   post("object name: %s\n", x->buffer_name->s_name);
   post("array name: %s\n", x->array_name->s_name);
   for(int i = 0; i < x->a_vec_length; i++)
@@ -46,8 +59,9 @@ void wavesetbuffer_print(t_wavesetbuffer *x)
       post("filter value: %f\n", waveset.filt);
     }
   }
+  */
+  print_reference_list(x->reference_listp);
 }
-
 
 /* Methods for sorting and unsorting the wavesettable */
 
@@ -72,6 +86,8 @@ void wavesetbuffer_sort(t_wavesetbuffer* x)
   }
 }
 
+/* Method for filtering inside the bufferobject */
+
 /*
  * saves a copy of the contents of the specified array into the object,
  * that is only refreshed when the set method is called (not at every dsp-cycle)!
@@ -82,14 +98,16 @@ void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
   t_garray *a;
   t_word* buf;
 
-  
   freebytes(x->a_vec, x->a_vec_length * sizeof(t_word));
   freebytes(x->sorted_lookup, x->num_wavesets * sizeof(int));
-  
+
+  /* binding the name of the buffer object so that
+     it can be found by pd_findbyclass in wavesetstepper~ */
   if (*x->buffer_name->s_name)
     pd_unbind(&x->x_obj.ob_pd, x->buffer_name);
   pd_bind(&x->x_obj.ob_pd, x->buffer_name);
-  
+
+  /* finding the garray object and saving its contents into buf */
   x->array_name = array_name;
   if (!(a = (t_garray *)pd_findbyclass(array_name, garray_class))) {
     if (*array_name->s_name) {
@@ -102,13 +120,13 @@ void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
   } else {
     garray_usedindsp(a);
   }
-  // refreshing the copy of the array
-  x->a_vec = (t_word*)getbytes(x->a_vec_length * sizeof(t_word));
   
+  /* refreshing the copy of the array */
+  x->a_vec = (t_word*)getbytes(x->a_vec_length * sizeof(t_word));
   for(int i = 0; i < x->a_vec_length; i++)
     x->a_vec[i] = buf[i];
 
-  // analising for wavesets
+  /* analising the samplevector */
   if(!x->a_vec)  {
     pd_error(x, "wavesetbuffer: unable to read array");
     x->waveset_array = NULL;
@@ -117,8 +135,8 @@ void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
   else
     analyse_wavesets(x, x->a_vec, x->a_vec_length);
 
-  x->sorted_lookup = (int*)getbytes(x->num_wavesets * sizeof(int));
-  
+  /* sorting the wavesetarray */
+  x->sorted_lookup = (int*)getbytes(x->num_wavesets * sizeof(int));  
   if(x->sorted) {
     x->sorted = 0;
     wavesetbuffer_sort(x);
@@ -127,7 +145,7 @@ void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
     x->sorted = 1;
     wavesetbuffer_reset(x);
   }
-
+  
   x->array_name = array_name;
 }
 
@@ -155,6 +173,8 @@ void *wavesetbuffer_new(t_symbol *s1, t_symbol *s2)
   }
   else
     analyse_wavesets(x, x->a_vec, x->a_vec_length);
+
+  x->reference_listp = new_ref_list();
     
   outlet_new(&x->x_obj, gensym("float"));
   
