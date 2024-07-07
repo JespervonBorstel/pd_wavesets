@@ -229,7 +229,7 @@ void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
     rp.wavesetstepper = x;
     remove_from_reference_list(rp, wavesetstepper, x->bufp);
   }
-  freebytes(x->filter_lookup, x->lookup_size * sizeof(int));
+  freebytes(x->filter_lookup, x->bufp->num_wavesets * sizeof(int));
   inlet_free(x->step_in);
   inlet_free(x->delta_in);
   
