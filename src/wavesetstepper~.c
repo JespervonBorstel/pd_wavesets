@@ -36,10 +36,10 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   maxindex = x->bufp->a_vec_length;
   const t_waveset *waveset_array = x->bufp->waveset_array;
 
-  int* filter_lookup = x->filter_lookup;
+  const int* filter_lookup = x->filter_lookup;
   int lookup_size = x->lookup_size;
 
-  int* sorted_lookup = x->bufp->sorted_lookup;
+  const int* sorted_lookup = x->bufp->sorted_lookup;
   
   float sr = sys_getsr();
   
@@ -146,25 +146,32 @@ int is_in_filter_range(t_waveset waveset, t_float lower_filt, t_float upper_filt
 {
   int bool = 0;
   if((waveset.filt >= lower_filt) && (waveset.filt <= upper_filt))
-    bool++;
+    bool = 1;
   return bool;
+}
+
+int count_in_filter_range(t_waveset* waveset_array, int num_wavesets,
+			  t_float lower_filt, t_float upper_filt)
+{
+  int counter = 0;
+  for(int i = 0; i < num_wavesets; i++) {
+    if(is_in_filter_range(waveset_array[i], lower_filt, upper_filt))
+      counter++;
+  }
+  return counter;
 }
 
 /* makes the filter_lookup array and saves its size int num_in_filter_range */
 int *make_filter_lookup(t_waveset* waveset_array, int num_wavesets, int* num_in_filter_range,
 			t_float lower_filt, t_float upper_filt)
 {
-  /* allocates a lookup array that has the same size as the wavesetarray
-     but is only indexed in the range that is set by this
-     function in the variable num_in_filter_range.
-     This is wasteful in terms of memory but efficient for the cpu
-     because we only need to iterate over the array once.
-     Might change this if it causes issues. */
-  int* filter_lookup = (int*)getbytes(num_wavesets * sizeof(int));
+  (*num_in_filter_range) = count_in_filter_range(waveset_array, num_wavesets, lower_filt, upper_filt);
+  int counter = 0;
+  int* filter_lookup = (int*)getbytes((*num_in_filter_range) * sizeof(int));
   for(int i = 0; i < num_wavesets; i++) {
     if(is_in_filter_range(waveset_array[i], lower_filt, upper_filt)) {
-      filter_lookup[*num_in_filter_range] = i;
-      (*num_in_filter_range)++;
+      filter_lookup[counter] = i;
+      counter++;
     }
   }
   return filter_lookup;
@@ -173,8 +180,9 @@ int *make_filter_lookup(t_waveset* waveset_array, int num_wavesets, int* num_in_
 void wavesetstepper_tilde_filter(t_wavesetstepper_tilde *x, t_floatarg f1, t_floatarg f2)
 {
   /* frees the lookup if it exists */
-  if(x->filter_lookup)
+  if(x->filter_lookup) {
     freebytes(x->filter_lookup, x->lookup_size * sizeof(int));
+  }
   
   t_waveset* waveset_array = x->bufp->waveset_array;
   int num_wavesets = x->bufp->num_wavesets;
@@ -198,19 +206,8 @@ void wavesetstepper_tilde_filter(t_wavesetstepper_tilde *x, t_floatarg f1, t_flo
   */
 }
 
-/* safety needed in case that the bufferpointer points to a corrupted bufferobject */
-
-void buffer_still_there(t_wavesetstepper_tilde *x)
-{
-  t_wavesetbuffer *a;
-  a = (t_wavesetbuffer *)pd_findbyclass(x->buffer_name, wavesetbuffer_class);
-  if(a == NULL)
-    x->bufp = NULL;
-}
-
 void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
 {
-  buffer_still_there(x);
   dsp_add(wavesetstepper_tilde_perform, 6, x,
 	  sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[3]->s_vec, sp[0]->s_n);
 }
@@ -229,13 +226,21 @@ void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
     rp.wavesetstepper = x;
     remove_from_reference_list(rp, wavesetstepper, x->bufp);
   }
-  freebytes(x->filter_lookup, x->bufp->num_wavesets * sizeof(int));
+  freebytes(x->filter_lookup, x->lookup_size * sizeof(int));
   inlet_free(x->step_in);
   inlet_free(x->delta_in);
   
   outlet_free(x->x_out);
   outlet_free(x->freq_out);
   outlet_free(x->trig_out);
+}
+
+void wavesetstepper_tilde_print(t_wavesetstepper_tilde* x)
+{
+  post("lookup size: %d", x->lookup_size);
+  for(int i = 0; i < x->lookup_size; i++) {
+    post("%d: %d", i, x->filter_lookup[i]);
+  }
 }
 
 void *wavesetstepper_tilde_new(t_symbol *s)
@@ -307,5 +312,6 @@ void wavesetstepper_tilde_setup(void)
 		  gensym("set"), A_DEFSYMBOL, 0);
   class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_filter,
 		  gensym("filter"), A_FLOAT, A_FLOAT, 0);
-
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_filter,
+		  gensym("print"), A_GIMME, 0);
 }

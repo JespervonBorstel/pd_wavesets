@@ -1,9 +1,14 @@
-// Function to swap two elements 
+#ifndef UTILS
+#define UTILS
+
+#include "wavesets.h"
+
+/* Function to swap two elements */
 void swap(int* a, int* b) 
 { 
-	int temp = *a; 
-	*a = *b; 
-	*b = temp; 
+  int temp = *a; 
+  *a = *b; 
+  *b = temp; 
 } 
 
 int partition(int sorted_lookup[], int low, int high, t_waveset waveset_array[]) 
@@ -30,38 +35,38 @@ int partition(int sorted_lookup[], int low, int high, t_waveset waveset_array[])
   return j; 
 }
 
-// QuickSort function 
+/* QuickSort function  */
 void qsort_wavesets(int sorted_lookup[], int low, int high, t_waveset waveset_array[]) 
 { 
-	if (low < high) { 
-
-		// call Partition function to find Partition Index 
-	  int partitionIndex = partition(sorted_lookup, low, high, waveset_array); 
-
-		// Recursively call quickSort() for left and right 
-		// half based on partition Index 
-	  qsort_wavesets(sorted_lookup, low, partitionIndex - 1, waveset_array);
-	  qsort_wavesets(sorted_lookup, partitionIndex + 1, high, waveset_array);
-	} 
+  if (low < high) { 
+    
+    // call Partition function to find Partition Index 
+    int partitionIndex = partition(sorted_lookup, low, high, waveset_array); 
+    
+    // Recursively call quickSort() for left and right 
+    // half based on partition Index 
+    qsort_wavesets(sorted_lookup, low, partitionIndex - 1, waveset_array);
+    qsort_wavesets(sorted_lookup, partitionIndex + 1, high, waveset_array);
+  } 
 }
 
-// implementation of the positive mod
+/* implementation of the positive mod */
 int mod(int i, int n)
 {
     return (i % n + n) % n;
 }
 
 /* implementation of the reference list in the buffer object
- * if new dsp onject are added everything here needs to be updated:
+ * if new dsp object are added everything here needs to be updated:
  *  - type of the object added to the enum and union
  *  - nodecreation und remove function
  *  - add case to add_to_reference-list
  */
 
-// Enum for the different objects
+/* Enum for the different objects */
 typedef enum {
-    wavesetstepper,
-    wavesetplayer,
+  wavesetstepper,
+  wavesetplayer
 } object_type;
 
 /* converting the enem value to a string.
@@ -74,17 +79,17 @@ const char* get_type(object_type type) {
   }
 }
 
-// Union for different data types
+/* Union for different data types */
 typedef union {
-    t_wavesetstepper_tilde* wavesetstepper;
-    t_wavesetplayer_tilde* wavesetplayer;
+  t_wavesetstepper_tilde* wavesetstepper;
+  t_wavesetplayer_tilde* wavesetplayer;
 } reference_pointer;
 
-// Node structure
+/* Node structure */
 typedef struct _node {
-    reference_pointer object_pointer;
-    object_type type;
-    struct _node *next;
+  reference_pointer object_pointer;
+  object_type type;
+  struct _node *next;
 } t_node;
 
 typedef struct _ref_list {
@@ -98,7 +103,7 @@ t_ref_list *new_ref_list()
   return listp;
 }
 
-// Function to create a new node with wavesetstepperpointer
+/* Function to create a new node with wavesetstepperpointer */
 t_node* create_wavesetstepper_node(t_wavesetstepper_tilde* x) {
   t_node *new_node = (t_node *)getbytes(sizeof(t_node));
   new_node->object_pointer.wavesetstepper = x;
@@ -107,7 +112,7 @@ t_node* create_wavesetstepper_node(t_wavesetstepper_tilde* x) {
   return new_node;
 }
 
-// same for wavesetplayer
+/* same for wavesetplayer */
 t_node* create_wavesetplayer_node(t_wavesetplayer_tilde* x) {
   t_node *new_node = (t_node *)getbytes(sizeof(t_node));
   new_node->object_pointer.wavesetplayer = x;
@@ -134,7 +139,7 @@ void remove_node(t_ref_list *list, object_type type, reference_pointer rp)
   t_node* head = list->head;
   t_node* current = head;
   t_node* prev = NULL;
-  while(current != NULL) {
+  while(current) {
     int match = 0;
     if (current->type == type) {
       switch (type) {
@@ -148,7 +153,7 @@ void remove_node(t_ref_list *list, object_type type, reference_pointer rp)
 	  match = 1;
 	}
 	break;
-	// Add other cases if needed: will be needed for other objects referencing wavesetbuffer
+	/* Add other cases if needed: will be needed for other objects referencing wavesetbuffer */
       }
       if(match) {
 	if(prev == NULL)
@@ -164,21 +169,23 @@ void remove_node(t_ref_list *list, object_type type, reference_pointer rp)
   }
 }
 
-// Function to free the linked list
+/* Function to free the linked list
+ * segfaults for some reason, needs fixing */
 void free_list(t_node *head) {
-    t_node *current = head;
-    t_node *next_node;
-    while (current != NULL) {
-        next_node = current->next;
-        freebytes(current, sizeof(t_node));
-        current = next_node;
-    }
+  t_node *current = head;
+  t_node *next_node = NULL;
+  while (current != NULL) {
+    next_node = current->next;
+    freebytes(current, sizeof(t_node));
+    current = next_node;
+  }
 }
 
-void free_ref_list(t_ref_list *ref_list)
+void free_ref_list(t_ref_list *ref_listp)
 {
-  free_list(ref_list->head);
-  freebytes(ref_list, sizeof(ref_list)); 
+  /* uncomment if fixed */
+  //free_list(ref_listp->head);
+  freebytes(ref_listp, sizeof(t_ref_list));
 }
 
 void add_to_reference_list(reference_pointer rp, object_type type, t_wavesetbuffer* bufp)
@@ -213,3 +220,4 @@ void print_reference_list(t_ref_list *list)
   }
 }
 
+#endif UTILS

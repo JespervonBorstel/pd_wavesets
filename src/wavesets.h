@@ -1,6 +1,9 @@
 /*
   File for the necessary Datastructures 
  */
+
+#ifndef WAVESETS
+#define WAVESETS
 #include <m_pd.h>
 #include <puredata/g_canvas.h>
 
@@ -17,7 +20,6 @@ typedef struct {
   t_float filt;
 } t_waveset;
 
-
 typedef struct _wavesetbuffer
 {
   t_object x_obj;
@@ -27,7 +29,7 @@ typedef struct _wavesetbuffer
 
   int sorted;
   int* sorted_lookup;
-  
+
   int num_wavesets;
   t_waveset* waveset_array;
 
@@ -45,8 +47,11 @@ typedef struct _wavesetplayer_tilde
 {
   t_object x_obj;
   t_float x_f;
+  t_symbol* buffer_name;
+  t_wavesetbuffer* bufp;
   // index of the waveset being played in the waveset_array
   int current_waveset;
+  void (*update_fun_pointer)(struct _wavesetplayer_tilde*);
   // index of the currently played sample
   int current_index;
   t_outlet* x_out, *f_out, *trig_out;
@@ -92,3 +97,5 @@ typedef struct _wavesetstepper_tilde
   t_outlet* x_out, *freq_out, *trig_out;
 
 } t_wavesetstepper_tilde;
+
+#endif

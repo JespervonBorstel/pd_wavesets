@@ -60,7 +60,6 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
   int num_wavesets = x->num_wavesets;
   
   if (!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0)
-      || x->num_wavesets == 0
       || !waveset_array)
     goto zero;
   maxindex -= 1;
@@ -73,7 +72,7 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
       int waveset_index;
 
       // waveset_index safety
-      waveset_index = (int)in[i] % num_wavesets;
+      waveset_index = mod((int)in[i], num_wavesets);
       
       cur_waveset = waveset_array[waveset_index];
       x->current_waveset = waveset_index;
@@ -154,7 +153,7 @@ void wavesetplayer_tilde_setup(void)
 					(t_method)wavesetplayer_tilde_free,
 					sizeof(t_wavesetplayer_tilde),
 					CLASS_DEFAULT,
-					A_GIMME,
+					A_DEFSYMBOL,
 					0);
   CLASS_MAINSIGNALIN(wavesetplayer_tilde_class, t_wavesetplayer_tilde, x_f);
   class_addmethod(wavesetplayer_tilde_class, (t_method)wavesetplayer_tilde_dsp,
