@@ -179,31 +179,39 @@ int *make_filter_lookup(t_waveset* waveset_array, int num_wavesets, int* num_in_
 
 void wavesetstepper_tilde_filter(t_wavesetstepper_tilde *x, t_floatarg f1, t_floatarg f2)
 {
-  /* frees the lookup if it exists */
-  if(x->filter_lookup) {
-    freebytes(x->filter_lookup, x->lookup_size * sizeof(int));
-  }
-  
-  t_waveset* waveset_array = x->bufp->waveset_array;
-  int num_wavesets = x->bufp->num_wavesets;
-
-  t_float upper_filt = f1 >= f2 ? f1 : f2;
-  t_float lower_filt = f1 <= f2 ? f1 : f2;
-
-  int num_in_filter_range = 0;
-  int* filter_lookup = make_filter_lookup(waveset_array, num_wavesets,
+  if(x->bufp) {
+    /* frees the lookup if it exists */
+    if(x->filter_lookup) {
+      freebytes(x->filter_lookup, x->lookup_size * sizeof(int));
+    }
+    
+    t_waveset* waveset_array = x->bufp->waveset_array;
+    int num_wavesets = x->bufp->num_wavesets;
+    
+    t_float upper_filt = f1 >= f2 ? f1 : f2;
+    t_float lower_filt = f1 <= f2 ? f1 : f2;
+    
+    int num_in_filter_range = 0;
+    int* filter_lookup = make_filter_lookup(waveset_array, num_wavesets,
 					  &num_in_filter_range, lower_filt, upper_filt);
-  
-  x->filt_1 = lower_filt;
-  x->filt_2 = upper_filt;
-  x->filter_lookup = filter_lookup;
-  x->lookup_size = num_in_filter_range;
+    
+    x->filt_1 = lower_filt;
+    x->filt_2 = upper_filt;
+    x->filter_lookup = filter_lookup;
+    x->lookup_size = num_in_filter_range;
   /*
   post("lower_filt: %f\nupper_filt: %f\n", lower_filt, upper_filt);
   for(int i = 0; i < num_in_filter_range; i++) {
     post("i: %d -> index: %d -> filt %f\n", i, filter_lookup[i], waveset_array[filter_lookup[i]].filt);
   }
   */
+  }
+  else {
+    x->filt_1 = f1;
+    x->filt_2 = f2;
+    x->filter_lookup = NULL;
+    x->lookup_size = 0;
+  }
 }
 
 void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
