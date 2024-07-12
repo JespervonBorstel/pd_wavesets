@@ -9,20 +9,81 @@
      - waveset omission
  */
 
+inline t_sample four_point_interpolate(t_word *buf, t_word *wp, const t_sample idx,
+				       const int maxindex, const t_sample one_over_six)
+{
+  t_sample out_samp;
+  double findex = (double)idx;
+  int index = findex;
+  t_sample frac,  a,  b,  c,  d, cminusb;
+  if (index < 1)
+    index = 1, frac = 0;
+  else if (index > maxindex)
+    index = maxindex, frac = 1;
+  else frac = findex - index;
+  wp = buf + index;
+  a = wp[-1].w_float;
+  b = wp[0].w_float;
+  c = wp[1].w_float;
+  d = wp[2].w_float;
+  cminusb = c-b;
+  return out_samp = b + frac * (cminusb - one_over_six * ((t_sample)1.-frac)
+				* ((d - a - (t_sample)3.0 * cminusb)
+				   * frac + (d + a*(t_sample)2.0 - b*(t_sample)3.0)));
+}
+
+inline void perform_update_wavesetstepper(t_wavesetstepper_tilde *x, t_float step_c, t_float delta_c,
+					  t_float o_fac_c, int current_waveset,
+					  t_sample current_index, int is_omitted)
+{
+  x->step_c = step_c;
+  x->delta_c = delta_c;
+  x->o_fac_c = o_fac_c;
+  x->current_waveset = current_waveset;
+  x->current_index = current_index;
+  x->is_omitted = is_omitted;
+}
+
+inline void perform_update_counters(const t_float* step, t_float* step_c, const t_float* delta,
+				    t_float* delta_c, const t_float* o_fac, t_float* o_fac_c,
+				    int* is_omitted, t_sample* trig_out, int i)
+{
+  (*step_c) += (*step);
+  (*delta_c) += 1;
+  
+  if((*delta_c) >= (*delta)) {
+    // trigger signal if waveset index is reset
+    trig_out[i] = 1;
+    (*step_c) = 0;
+    (*delta_c) = 0;
+  }
+  
+  // omission algorithm
+  (*is_omitted) = 0;
+  (*o_fac_c) += (*o_fac);
+  if (*o_fac_c > 1) {
+    (*is_omitted) = 1;
+    (*o_fac_c) = (*o_fac_c) - 1;
+  }
+}
+
 t_int *wavesetstepper_tilde_perform(t_int *w)
 {
   t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)(w[1]);
   const t_sample *in = (t_sample *)(w[2]);
-  t_sample *out = (t_sample *)(w[3]);
-  t_sample *freq_out = (t_sample *)(w[4]);
-  t_sample *trig_out = (t_sample *)(w[5]);
-  int n = (int)(w[6]), i, maxindex;
+  const t_sample *plb_in = (t_sample *)(w[3]);
+  t_sample *out = (t_sample *)(w[4]);
+  t_sample *freq_out = (t_sample *)(w[5]);
+  t_sample *trig_out = (t_sample *)(w[6]);
+  int n = (int)(w[7]), i, maxindex;
   
   if(!x->bufp)
     goto zero;
   
   t_word *buf = x->bufp->a_vec;
+  t_word *wp;
   maxindex = x->bufp->a_vec_length;
+  const t_sample one_over_six = 1./6.;
   const t_waveset *waveset_array = x->bufp->waveset_array;
 
   const int* filter_lookup = x->filter_lookup;
@@ -33,15 +94,15 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   float sr = sys_getsr();
   
   // safety in case no waveset_array exists
+  int waveset_index = x->current_waveset;
   t_waveset cur_waveset;
   if (waveset_array)
-    cur_waveset = waveset_array[x->current_waveset];
+    cur_waveset = waveset_array[waveset_index];
   
-  int index = x->current_index;
-
+  t_sample index = x->current_index;
   int is_omitted = x->is_omitted;
-  t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac;
-  t_float o_fac_c = x->o_fac_c;
+  t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac, o_fac_c = x->o_fac_c,
+    delta = x->delta, delta_c = x->delta_c, step = x->step, step_c = x->step_c;
   
   if (!buf
       || !waveset_array
@@ -54,44 +115,26 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   for (i = 0; i < n; i++) {
     trig_out[i] = 0;
     // in case playing a waveset is finished, a new waveset starts playing
-    if(index > cur_waveset.end_index || index > maxindex) {
-      
-      x->step_c += x->step;
-      x->delta_c += 1;
-      int waveset_index;
-      
-      if(x->delta_c >= x->delta) {
+    if(index > cur_waveset.end_index || index < cur_waveset.start_index || index < 0 || index > maxindex) {
 
-	// trigger signal if waveset index is reset
-	trig_out[i] = 1;
-	x->step_c = 0;
-	x->delta_c = 0;
-      }
-
-      // omission algorithm
-      is_omitted = 0;
-      o_fac_c += o_fac;
-      if (o_fac_c > 1) {
-        is_omitted = 1;
-	o_fac_c = o_fac_c - 1;
-      }
-      
+      perform_update_counters(&step, &step_c, &delta, &delta_c, &o_fac, &o_fac_c, &is_omitted, trig_out, i);
       // filtering
-      waveset_index = sorted_lookup[filter_lookup[mod((in[i] + x->step_c), lookup_size)]];
+      waveset_index = sorted_lookup[filter_lookup[mod((in[i] + step_c), lookup_size)]];
       
       cur_waveset = waveset_array[waveset_index];
       freq = (1 / (t_sample)cur_waveset.size) * sr;
-      x->current_waveset = waveset_index;
-      index = cur_waveset.start_index;
+      
+      if(plb_in[i] > 0)
+	index = cur_waveset.start_index;
+      else
+	index = cur_waveset.end_index;
     }
-    *out++ = buf[index].w_float * is_omitted;
+    *out++ = four_point_interpolate(buf, wp, index, maxindex, one_over_six) * is_omitted;
     *freq_out++ = freq;
-    index++;
+    index += plb_in[i];
   }
-  x->current_index = index;
-  x->o_fac_c = o_fac_c;
-  x->is_omitted = is_omitted;
-  return (w+7);
+  perform_update_wavesetstepper(x, step_c, delta_c, o_fac_c, waveset_index, index, is_omitted);
+  return (w+8);
   
  zero:
   while (n--) {
@@ -99,7 +142,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
     *trig_out++ = 0;
     *freq_out++ = 0;
   } 
-  return (w+7);
+  return (w+8);
 }
 
 void wavesetstepper_tilde_bang(t_wavesetstepper_tilde* x)
@@ -204,8 +247,8 @@ void wavesetstepper_tilde_filter(t_wavesetstepper_tilde *x, t_floatarg f1, t_flo
 
 void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
 {
-  dsp_add(wavesetstepper_tilde_perform, 6, x,
-	  sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[3]->s_vec, sp[0]->s_n);
+  dsp_add(wavesetstepper_tilde_perform, 7, x,
+	  sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[3]->s_vec, sp[4]->s_vec, sp[0]->s_n);
 }
 
 /* function that is called by wavesetbuffer if the buffer changes */
@@ -223,6 +266,7 @@ void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
     remove_from_reference_list(rp, wavesetstepper, x->bufp);
   }
   freebytes(x->filter_lookup, x->lookup_size * sizeof(int));
+  inlet_free(x->plb_in);
   inlet_free(x->step_in);
   inlet_free(x->delta_in);
   
@@ -262,7 +306,8 @@ void *wavesetstepper_tilde_new(t_symbol *s)
   wavesetstepper_tilde_filter(x, 0, 1);
 
   x->update_fun_pointer = &update_wavesetstepper_tilde;
-  
+
+  x->plb_in = inlet_new(&x->x_obj, &x->x_obj.ob_pd, &s_signal, &s_signal);
   x->step_in = floatinlet_new(&x->x_obj, &x->step);
   x->delta_in = floatinlet_new(&x->x_obj, &x->delta);
   x->o_fac_in = floatinlet_new(&x->x_obj, &x->o_fac);
