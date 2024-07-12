@@ -1,4 +1,6 @@
-#include "wavesetbuffer.c"
+#include "wavesets.h"
+#include "classes.h"
+#include "utils.h"
 
 /*
   wavesetstepper: wavesetplayer with additional Features
@@ -6,19 +8,6 @@
        specified by the index given in the first inlet.
      - waveset omission
  */
-
-t_class *wavesetstepper_tilde_class;
-
-/*
-   function for returning the index of the nth next waveset within Filterrange
-   nth is is the floor value of the step_counter
-   should work circular on the waveset-array wrapping around at the end
-   filtering should act as if the array wavesets out of
-   range don't exist
-   return -1 if no such waveset exists
-
-   - needs adjustment for negative step values
-*/
 
 t_int *wavesetstepper_tilde_perform(t_int *w)
 {
@@ -121,26 +110,25 @@ void wavesetstepper_tilde_bang(t_wavesetstepper_tilde* x)
 
 void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s)
 {
-  if(s != x->buffer_name) {
-    /* if a new buffer was specified remove the reference
-       in the old buffer and add it to the new */
-    reference_pointer rp;
-    rp.wavesetstepper = x;
-    remove_from_reference_list(rp, wavesetstepper, x->bufp);
-    
-    t_wavesetbuffer *a = NULL;
-    a = (t_wavesetbuffer *)pd_findbyclass((x->buffer_name = s), wavesetbuffer_class);
-    if(a) {
-      x->bufp = a;
-      /* adding the object to the reference list in the bufferobject */
-      add_to_reference_list(rp, wavesetstepper, a);
-    }
-    else {
+  /* if a new buffer was specified remove the reference
+     in the old buffer and add it to the new */
+  reference_pointer rp;
+  rp.wavesetstepper = x;
+  remove_from_reference_list(rp, wavesetstepper, x->bufp);
+  
+  t_wavesetbuffer *a = NULL;
+  a = (t_wavesetbuffer *)pd_findbyclass((x->buffer_name = s), wavesetbuffer_class);
+  if(a) {
+    x->bufp = a;
+    /* adding the object to the reference list in the bufferobject */
+    add_to_reference_list(rp, wavesetstepper, a);
+  }
+  else {
       pd_error(x, "wavesetstepper~: no bufferobject found");
       x->bufp = NULL;
-    }
   }
 }
+
 
 int is_in_filter_range(t_waveset waveset, t_float lower_filt, t_float upper_filt)
 {
@@ -255,24 +243,8 @@ void *wavesetstepper_tilde_new(t_symbol *s)
 {
   t_wavesetstepper_tilde *x = (t_wavesetstepper_tilde *)pd_new(wavesetstepper_tilde_class);
 
-  if (!s)
-    pd_error(x, "wavesetstepper~: no buffer name provided");
-  t_wavesetbuffer *a;
-  a = (t_wavesetbuffer*)pd_findbyclass((x->buffer_name = s), wavesetbuffer_class);
-
-  if(a) {
-    x->bufp = a;
-
-    /* adding the object to the reference list in the bufferobject */
-    reference_pointer rp;
-    rp.wavesetstepper = x;
-    add_to_reference_list(rp, wavesetstepper, a);
-  }
-  else {
-    pd_error(x, "wavesetstepper~: no bufferobject found");
-    x->bufp = NULL;
-  }
-   
+  wavesetstepper_tilde_set(x, s);
+  
   x->x_f = 0;
   
   x->step = 0;

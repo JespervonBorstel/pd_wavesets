@@ -1,41 +1,38 @@
 #include "wavesets.h"
-#include "analyse.h"
+#include "utils.h"
+#include "classes.h"
 
-/*
-  wavesetstepper: wavesetplayer with additional Features
-     - reads a certain amount of wavesets from an array by increment starting from the waveset
-       specified by the index given in the first inlet.
-     - waveset omission
- */
+void update_wavesetplayer_tilde()
+{
+}
 
-static t_class *wavesetplayer_tilde_class;
-
-void *wavesetplayer_tilde_new(t_symbol *s, int argc, t_atom *argv)
+void *wavesetplayer_tilde_new(t_symbol *s)
 {
   t_wavesetplayer_tilde *x = (t_wavesetplayer_tilde *)pd_new(wavesetplayer_tilde_class);
 
-  arrayvec_init(&x->x_v, x, argc, argv);
-  t_word* buf;
-  int maxindex;
+  if (!s)
+    pd_error(x, "wavesetplayer~: no buffer name provided");
+  t_wavesetbuffer *a;
+  a = (t_wavesetbuffer*)pd_findbyclass((x->buffer_name = s), wavesetbuffer_class);
   
-  if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 1)) {
-    pd_error(x, "wavesetplayer~: unable to read array");
-    x->waveset_array = NULL;
-    x->num_wavesets = 0;
-    x->current_waveset = 0;
-    x->current_index = 0;
+  if(a) {
+    x->bufp = a;
+    
+    /* adding the object to the reference list in the bufferobject */
+    reference_pointer rp;
+    rp.wavesetplayer = x;
+    add_to_reference_list(rp, wavesetplayer, a);
   }
-  
   else {
-    analyse_wavesets_player(x, buf, maxindex);
-    x->current_waveset = 0;
-    x->current_index = x->waveset_array[0].start_index;
+    pd_error(x, "wavesetplayer~: no bufferobject found");
+    x->bufp = NULL;
   }
   
   x->x_f = 0;
   
+  x->update_fun_pointer = &update_wavesetplayer_tilde;
+  
   x->x_out = outlet_new(&x->x_obj, &s_signal);
-  x->f_out = outlet_new(&x->x_obj, &s_float);
   x->trig_out = outlet_new(&x->x_obj, &s_signal);
   
   return (x);
@@ -48,18 +45,23 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
   t_sample *out = (t_sample *)(w[3]);
   t_sample *trig_out = (t_sample *)(w[4]);
   int n = (int)(w[5]), i, maxindex;
-  t_word *buf;
-  const t_waveset *waveset_array = x->waveset_array;
+
+  if(!x->bufp)
+    goto zero;
+
+  t_word *buf = x->bufp->a_vec;
+  maxindex = x->bufp->a_vec_length;
+  const t_waveset *waveset_array = x->bufp->waveset_array;
 
   // safety in case no waveset_array exists
   t_waveset cur_waveset;
-  if (x->waveset_array)
+  if (waveset_array)
     cur_waveset = waveset_array[x->current_waveset];
   
   int index = x->current_index;
-  int num_wavesets = x->num_wavesets;
+  int num_wavesets = x->bufp->num_wavesets;
   
-  if (!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 0)
+  if (!buf
       || !waveset_array)
     goto zero;
   maxindex -= 1;
@@ -92,58 +94,44 @@ t_int *wavesetplayer_tilde_perform(t_int *w)
   return (w+6);
 }
 
-void wavesetplayer_tilde_print(t_wavesetplayer_tilde* x)
+void wavesetplayer_tilde_set(t_wavesetplayer_tilde *x, t_symbol *s)
 {
-  if(x->num_wavesets == 0) {
-    post("waveset_array empty");
-  }
-  else {
-    post("number of wavesets: %d", x->num_wavesets);
-    for(int i = 0; i < x->num_wavesets; i++) {
-      t_waveset waveset = x->waveset_array[i];
-      post("i : %d", i);
-      post("size : %d", waveset.size);
-      post("start : %d", waveset.start_index);
-      post("end : %d", waveset.end_index);
-      post("filter value: %f\n", waveset.filt);
+  if(s != x->buffer_name) {
+    /* if a new buffer was specified remove the reference
+       in the old buffer and add it to the new */
+    reference_pointer rp;
+    rp.wavesetplayer = x;
+    remove_from_reference_list(rp, wavesetplayer, x->bufp);
+    
+    t_wavesetbuffer *a = NULL;
+    a = (t_wavesetbuffer *)pd_findbyclass((x->buffer_name = s), wavesetbuffer_class);
+    if(a) {
+      x->bufp = a;
+      /* adding the object to the reference list in the bufferobject */
+      add_to_reference_list(rp, wavesetplayer, a);
+    }
+    else {
+      pd_error(x, "wavesetplayer ~: no bufferobject found");
+      x->bufp = NULL;
     }
   }
 }
 
-void wavesetplayer_tilde_size(t_wavesetplayer_tilde* x)
-{
-  outlet_float(x->f_out, x->num_wavesets);
-}
-
-void wavesetplayer_tilde_set(t_wavesetplayer_tilde *x, t_symbol *s,
-    int argc, t_atom *argv)
-{
-    arrayvec_set(&x->x_v, argc, argv);
-    int maxindex;
-    t_word* buf;
-    
-    if(!dsparray_get_array(x->x_v.v_vec, &maxindex, &buf, 1))
-      pd_error(x, "wavesetplayer~: unable to read array");
-    analyse_wavesets_player(x, buf, maxindex);
-    x->current_waveset = 0;
-    x->current_index = 0;
-}
-
 void wavesetplayer_tilde_dsp(t_wavesetplayer_tilde *x, t_signal **sp)
 {
-  arrayvec_testvec(&x->x_v);  
   dsp_add(wavesetplayer_tilde_perform, 5, x,
 	  sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[0]->s_n);
 }
 
 void wavesetplayer_tilde_free(t_wavesetplayer_tilde *x)
 {
-    arrayvec_free(&x->x_v);
-    free_wavesets_player(x);
-
-    outlet_free(x->x_out);
-    outlet_free(x->f_out);
-    outlet_free(x->trig_out);
+  if(x->bufp) {
+    reference_pointer rp;
+    rp.wavesetplayer = x;
+    remove_from_reference_list(rp, wavesetplayer, x->bufp);
+  }
+  outlet_free(x->x_out);
+  outlet_free(x->trig_out);
 }
 
 void wavesetplayer_tilde_setup(void)
@@ -159,9 +147,5 @@ void wavesetplayer_tilde_setup(void)
   class_addmethod(wavesetplayer_tilde_class, (t_method)wavesetplayer_tilde_dsp,
 		  gensym("dsp"), A_CANT, 0);
   class_addmethod(wavesetplayer_tilde_class, (t_method)wavesetplayer_tilde_set,
-		  gensym("set"), A_GIMME, 0);
-  class_addmethod(wavesetplayer_tilde_class, (t_method)wavesetplayer_tilde_print,
-		  gensym("print"), A_GIMME, 0);
-  class_addmethod(wavesetplayer_tilde_class, (t_method)wavesetplayer_tilde_size,
-		  gensym("size"), A_GIMME, 0);
+		  gensym("set"), A_DEFSYMBOL, 0);
 }

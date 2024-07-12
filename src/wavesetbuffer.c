@@ -1,7 +1,7 @@
 #include "wavesets.h"
 #include "utils.h"
 #include "analyse.h"
-#include <math.h>
+#include "classes.h"
 
 /*
  * wavesetbuffer: object that stores and analyses soundfile arrays
@@ -25,9 +25,8 @@
  *           - if the dsp-object changes the buffer it references,
  *             the buffer needs to remove the pointer out of the list, and add it to the new buffer (done)
  *       7. cleaning up
+ *       8. implementing playbackspeed with 4 point interpolation and a force frequency method
  */
-
-t_class *wavesetbuffer_class;
 
 void free_all_references(const t_ref_list* ref_listp)
 {
@@ -70,7 +69,7 @@ void wavesetbuffer_print(t_wavesetbuffer *x)
   if(x->num_wavesets == 0) {
     post("waveset_array empty");
   }
-  else {
+  /*  else {
     post("number of wavesets: %d", x->num_wavesets);
     for(int i = 0; i < x->num_wavesets; i++) {
       t_waveset waveset = x->waveset_array[i];
@@ -81,7 +80,8 @@ void wavesetbuffer_print(t_wavesetbuffer *x)
       post("filter value: %f\n", waveset.filt);
     }
   }
-  //print_reference_list(x->reference_listp);
+  */
+  print_reference_list(x->reference_listp);
 }
 
 /* Methods for sorting and unsorting the wavesettable */
@@ -206,7 +206,7 @@ void *wavesetbuffer_new(t_symbol *s1, t_symbol *s2)
   
   wavesetbuffer_set(x, s2);    
   
-  outlet_new(&x->x_obj, gensym("float"));
+  x->f_out = outlet_new(&x->x_obj, &s_float);
   
   return (x);
 }

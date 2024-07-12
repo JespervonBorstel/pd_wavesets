@@ -5,3 +5,4 @@ tab_reference.c
 *.c~
 *~
 src/filter.c
+*.so

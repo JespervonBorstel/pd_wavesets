@@ -2,15 +2,46 @@
   File for the necessary Datastructures 
  */
 
-#ifndef WAVESETS
-#define WAVESETS
+#ifndef WAVESETS_H
+#define WAVESETS_H
 #include <m_pd.h>
 #include <puredata/g_canvas.h>
+#include <math.h>
 
-typedef struct _node t_node;
-typedef struct _ref_list t_ref_list;
+/* implementation of the reference list in the buffer object
+ * if new dsp object are added everything here needs to be updated:
+ *  - type of the object added to the enum and union
+ *  - nodecreation und remove function
+ *  - add case to add_to_reference-list
+ */
 
-typedef struct {
+/* Enum for the different objects */
+typedef enum {
+  wavesetstepper,
+  wavesetplayer
+} object_type;
+
+typedef struct _wavesetstepper_tilde t_wavesetstepper_tilde;
+typedef struct _wavesetplayer_tilde t_wavesetplayer_tilde;
+
+/* Union for different data types */
+typedef union {
+  t_wavesetstepper_tilde* wavesetstepper;
+  t_wavesetplayer_tilde* wavesetplayer;
+} reference_pointer;
+
+/* Node structure */
+typedef struct _node {
+  reference_pointer object_pointer;
+  object_type type;
+  struct _node *next;
+} t_node;
+
+typedef struct _ref_list {
+  t_node* head;
+} t_ref_list;
+
+typedef struct _waveset {
   int start_index;
   int end_index;
   int size;
@@ -54,7 +85,7 @@ typedef struct _wavesetplayer_tilde
   void (*update_fun_pointer)(struct _wavesetplayer_tilde*);
   // index of the currently played sample
   int current_index;
-  t_outlet* x_out, *f_out, *trig_out;
+  t_outlet* x_out, *trig_out;
   
 } t_wavesetplayer_tilde;
 
