@@ -117,6 +117,9 @@ typedef struct _wavesetstepper_tilde
   int* filter_lookup;
   int lookup_size;
 
+  // value of the pitch to be forced on the played wavesets
+  t_float force_pitch;
+
   // store a function that is called by wavesetbuffer, when it changes
   void (*update_fun_pointer)(struct _wavesetstepper_tilde*);
   // index of the waveset being played in the waveset_array
