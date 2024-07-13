@@ -11,21 +11,10 @@
  */
 
 /*
- * TODO: 1. create wavesetbuffer-object (done)
- *       2. adjust wavesetstepper object to work with it (done)
- *       3. Fixing the unbind error message when creating the object (done)
- *       4. Testing if wavesetstepper~ still works (done)
- *       5. making wavesetplayer~ work with it (done)
- *       6. implementing wavesetfiltering in wavesetstepper at k-rate (DONE!)
- *         - this will need a way of communicating between buffer and dsp object
- *           in case the buffer is changed
- *         - implementation:
- *           - have a list of pointers to all dsp-objects referencing the buffer
- *           - if the buffer is set, call an update-function that works on every dsp-object in the linked list
- *           - if the dsp-object changes the buffer it references,
- *             the buffer needs to remove the pointer out of the list, and add it to the new buffer (done)
- *       7. cleaning up (done?)
- *       8. implementing playbackspeed with 4 point interpolation and a force frequency method
+ * TODO:
+ * make everything compile into one library file
+ * create helpfiles for all objects and make them work
+ *
  */
 
 void free_all_references(const t_ref_list* ref_listp)
