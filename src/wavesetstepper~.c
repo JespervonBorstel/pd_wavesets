@@ -104,7 +104,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   t_waveset cur_waveset;
   cur_waveset = waveset_array[waveset_index];
 
-  /* getting all values from the wvaesetstepper struct */
+  /* getting all values from the wavesetstepper struct */
   t_sample index = x->current_index;
   int is_omitted = x->is_omitted;
   t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac, o_fac_c = x->o_fac_c,
@@ -112,13 +112,24 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
     step_c = x->step_c, sr = sys_getsr(), force_pitch = x->force_pitch;
   t_sample freq = (1 / (t_sample)cur_waveset.size) * sr;
 
+  // flag for the dsp loop to indicate that a new waveset is to be played
+  int waveset_finished = 0;
+  t_sample index_delta = 0;
   maxindex -= 1;
   
   for (i = 0; i < n; i++) {
     trig_out[i] = 0;
     // in case playing a waveset is finished, a new waveset starts playing
-    if(index > cur_waveset.end_index || index < cur_waveset.start_index || index < 0 || index > maxindex) {
-
+    if(index > cur_waveset.end_index) {
+      index_delta = index - (t_sample)cur_waveset.end_index;
+      waveset_finished = 1;
+	}
+    
+    if(index < cur_waveset.start_index) {
+      index_delta = (t_sample)cur_waveset.start_index - index;
+      waveset_finished = 1;
+    }
+    if(waveset_finished) {
       perform_update_counters(&step, &step_c, &delta, &delta_c, &o_fac, &o_fac_c, &is_omitted, trig_out, i);
       // filtering
       waveset_index = sorted_lookup[filter_lookup[mod((in[i] + step_c), lookup_size)]];
@@ -127,14 +138,17 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       freq = (1 / (t_sample)cur_waveset.size) * sr;
       
       if(plb_in[i] > 0)
-	index = cur_waveset.start_index;
+	index = cur_waveset.start_index + index_delta;
       else
-	index = cur_waveset.end_index;
+	index = cur_waveset.end_index - index_delta;
+      
+      waveset_finished = 0;
     }
     *out++ = four_point_interpolate(buf, wp, index, maxindex, one_over_six) * is_omitted;
     *freq_out++ = freq;
+    
     if(force_pitch)
-      index += (force_pitch / freq);
+      index += (force_pitch / freq) * copysign(1.0, plb_in[i]);
     else
       index += plb_in[i];
   }

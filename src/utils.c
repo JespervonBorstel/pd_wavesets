@@ -158,8 +158,10 @@ void free_list(t_node *head) {
 void free_ref_list(t_ref_list *ref_listp)
 {
   /* uncomment if fixed */
-  //free_list(ref_listp->head);
-  freebytes(ref_listp, sizeof(t_ref_list));
+  if(ref_listp) {
+    //free_list(ref_listp->head);
+    freebytes(ref_listp, sizeof(t_ref_list));
+  }
 }
 
 void add_to_reference_list(reference_pointer rp, object_type type, t_wavesetbuffer* bufp)

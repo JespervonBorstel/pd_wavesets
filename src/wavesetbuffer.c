@@ -14,7 +14,11 @@
  * TODO:
  * make everything compile into one library file
  * create helpfiles for all objects and make them work
+ * Make a normalize Method for Wavesetstepper
+ * fix non integer index issue: at waveset change do not just set the new index to the start index of the new waveset 
+ * give build instructions on github in the Readme.md
  *
+ * Maybe next: wavesetexchanger~: nimmt wellenform auf anderem Array und tauscht damit einzelne Wavesets aus
  */
 
 void free_all_references(const t_ref_list* ref_listp)
@@ -37,6 +41,7 @@ void free_all_references(const t_ref_list* ref_listp)
   }
 }
 
+/* set all pointers to zero after freeing */ 
 void wavesetbuffer_free(t_wavesetbuffer *x)
 {
   freebytes(x->a_vec, x->a_vec_length * sizeof(t_word));
