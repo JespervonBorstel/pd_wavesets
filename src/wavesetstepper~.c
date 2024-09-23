@@ -109,9 +109,11 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   int is_omitted = x->is_omitted;
   t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac, o_fac_c = x->o_fac_c,
     delta = x->delta, delta_c = x->delta_c, step = x->step,
-    step_c = x->step_c, sr = sys_getsr(), force_pitch = x->force_pitch;
+    step_c = x->step_c, sr = sys_getsr(), force_pitch = x->force_pitch
+    ;
   t_sample freq = (1 / (t_sample)cur_waveset.size) * sr;
-
+  t_sample cur_waveset_loudness = cur_waveset.loudest;
+  t_sample normalise = (t_sample)x->normalise;
   // flag for the dsp loop to indicate that a new waveset is to be played
   int waveset_finished = 0;
   t_sample index_delta = 0;
@@ -136,6 +138,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       
       cur_waveset = waveset_array[waveset_index];
       freq = (1 / (t_sample)cur_waveset.size) * sr;
+      cur_waveset_loudness = cur_waveset.loudest;
       
       if(plb_in[i] > 0)
 	index = cur_waveset.start_index + index_delta;
@@ -144,7 +147,9 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       
       waveset_finished = 0;
     }
-    *out++ = four_point_interpolate(buf, wp, index, maxindex, one_over_six) * is_omitted;
+    *out++ = four_point_interpolate(buf, wp, index, maxindex, one_over_six)
+      * is_omitted
+      * ((normalise / cur_waveset_loudness) + (1.0 - normalise));
     *freq_out++ = freq;
     
     if(force_pitch)
@@ -275,6 +280,15 @@ void wavesetstepper_tilde_force_pitch(t_wavesetstepper_tilde *x, t_floatarg f)
   x->force_pitch = f;
 }
 
+void wavesetstepper_tilde_normalise(t_wavesetstepper_tilde *x, t_floatarg f)
+{
+  // clipping the argument
+  f = f > 1 ? 1 : f;
+  f = f < 0 ? 0 : f;
+  
+  x->normalise = f;
+}
+
 void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
 {
   dsp_add(wavesetstepper_tilde_perform, 7, x,
@@ -335,6 +349,7 @@ void *wavesetstepper_tilde_new(t_symbol *s)
   x->filt_2 = 1;
   wavesetstepper_tilde_filter(x, 0, 1);
 
+  x->normalise = 0;
   x->force_pitch = 0;
 
   x->update_fun_pointer = &update_wavesetstepper_tilde;
@@ -373,4 +388,6 @@ void wavesetstepper_tilde_setup(void)
 		  gensym("print"), A_GIMME, 0);
   class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_force_pitch,
 		  gensym("force_pitch"), A_FLOAT, 0);
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_normalise,
+		  gensym("normalise"), A_FLOAT, 0);
 }

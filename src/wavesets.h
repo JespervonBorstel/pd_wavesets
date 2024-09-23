@@ -49,6 +49,8 @@ typedef struct _waveset {
   // a value between 0 and 1 with 0 being the
   // smallest size in the wavesetarray and 1 the biggest
   t_float filt;
+  // value of the loudest sample in the waveset
+  t_sample loudest;
 } t_waveset;
 
 typedef struct _wavesetbuffer
@@ -63,7 +65,7 @@ typedef struct _wavesetbuffer
 
   int num_wavesets;
   t_waveset* waveset_array;
-
+  
   int a_vec_length;
   t_word* a_vec;
 
@@ -117,6 +119,8 @@ typedef struct _wavesetstepper_tilde
   int* filter_lookup;
   int lookup_size;
 
+  // the mix factor for normalizing the level
+  t_float normalise;
   // value of the pitch to be forced on the played wavesets
   t_float force_pitch;
 
@@ -133,3 +137,4 @@ typedef struct _wavesetstepper_tilde
 } t_wavesetstepper_tilde;
 
 #endif
+

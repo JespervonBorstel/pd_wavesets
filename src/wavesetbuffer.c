@@ -14,8 +14,7 @@
  * TODO:
  * make everything compile into one library file
  * create helpfiles for all objects and make them work
- * Make a normalize Method for Wavesetstepper
- * fix non integer index issue: at waveset change do not just set the new index to the start index of the new waveset 
+ * give the force_pitch-method an argument for fading it in
  * give build instructions on github in the Readme.md
  *
  * Maybe next: wavesetexchanger~: nimmt wellenform auf anderem Array und tauscht damit einzelne Wavesets aus
@@ -63,7 +62,7 @@ void wavesetbuffer_print(t_wavesetbuffer *x)
   if(x->num_wavesets == 0) {
     post("waveset_array empty");
   }
-  /*  else {
+    else {
     post("number of wavesets: %d", x->num_wavesets);
     for(int i = 0; i < x->num_wavesets; i++) {
       t_waveset waveset = x->waveset_array[i];
@@ -72,9 +71,9 @@ void wavesetbuffer_print(t_wavesetbuffer *x)
       post("start : %d", waveset.start_index);
       post("end : %d", waveset.end_index);
       post("filter value: %f\n", waveset.filt);
+      post("loudest: %f\n", waveset.loudest);
     }
   }
-  */
   print_reference_list(x->reference_listp);
 }
 

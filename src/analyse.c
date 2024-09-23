@@ -113,6 +113,24 @@ void set_waveset_filt(t_waveset* waveset_array, int num_wavesets)
   freebytes(result, 2 * sizeof(int));
 }
 
+void set_waveset_peak_val(t_waveset* waveset, const t_word* buf)
+{
+  t_sample highest = 0;
+  for(int i = waveset->start_index; i < waveset->end_index; i++) {
+    t_sample sample = (t_sample)fabsf(buf[i].w_float);
+    if(sample > highest)
+      highest = sample;
+  }
+  waveset->loudest = highest;
+}
+
+void set_wavesets_loudness(t_waveset* waveset_array, int num_wavesets, const t_word* buf)
+{
+  for(int i = 0; i < num_wavesets; i++) {
+    set_waveset_peak_val(&(waveset_array[i]), buf);
+  }
+}
+
 void analyse_wavesets(t_wavesetbuffer *x, t_word* buf, int maxindex)
 {
   int num_zerocr = count_zerocr(buf, maxindex);
@@ -130,7 +148,9 @@ void analyse_wavesets(t_wavesetbuffer *x, t_word* buf, int maxindex)
   }
   
   set_waveset_sizes(x);
-  set_waveset_filt(waveset_array, x->num_wavesets);
+  set_waveset_filt(x->waveset_array, x->num_wavesets);
+
+  set_wavesets_loudness(x->waveset_array, x->num_wavesets, buf);
   
   freebytes(zerocr_arr, num_zerocr * sizeof(int));
 }
