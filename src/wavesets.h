@@ -121,8 +121,9 @@ typedef struct _wavesetstepper_tilde
 
   // the mix factor for normalizing the level
   t_float normalise;
-  // value of the pitch to be forced on the played wavesets
-  t_float force_pitch;
+  // value of the pitch to be forced on the played wavesets as a frequency
+  t_float forced_pitch;
+  t_float pitch_mix;
 
   // store a function that is called by wavesetbuffer, when it changes
   void (*update_fun_pointer)(struct _wavesetstepper_tilde*);

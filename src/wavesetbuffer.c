@@ -14,7 +14,6 @@
  * TODO:
  * make everything compile into one library file
  * create helpfiles for all objects and make them work
- * give the force_pitch-method an argument for fading it in
  * give build instructions on github in the Readme.md
  *
  * Maybe next: wavesetexchanger~: nimmt wellenform auf anderem Array und tauscht damit einzelne Wavesets aus

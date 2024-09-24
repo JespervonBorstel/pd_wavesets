@@ -109,8 +109,8 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   int is_omitted = x->is_omitted;
   t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac, o_fac_c = x->o_fac_c,
     delta = x->delta, delta_c = x->delta_c, step = x->step,
-    step_c = x->step_c, sr = sys_getsr(), force_pitch = x->force_pitch
-    ;
+    step_c = x->step_c, sr = sys_getsr(), forced_pitch = x->forced_pitch,
+    pitch_mix = x->pitch_mix;
   t_sample freq = (1 / (t_sample)cur_waveset.size) * sr;
   t_sample cur_waveset_loudness = cur_waveset.loudest;
   t_sample normalise = (t_sample)x->normalise;
@@ -152,10 +152,8 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       * ((normalise / cur_waveset_loudness) + (1.0 - normalise));
     *freq_out++ = freq;
     
-    if(force_pitch)
-      index += (force_pitch / freq) * copysign(1.0, plb_in[i]);
-    else
-      index += plb_in[i];
+    index += ((forced_pitch / freq) * copysign(1.0, plb_in[i])) * pitch_mix + plb_in[i] * (1 - pitch_mix);
+
   }
   perform_update_wavesetstepper(x, step_c, delta_c, o_fac_c, waveset_index, index, is_omitted);
   return (w+8);
@@ -275,9 +273,13 @@ void wavesetstepper_tilde_filter(t_wavesetstepper_tilde *x, t_floatarg f1, t_flo
  * Overwrites the second inlet
  */
 
-void wavesetstepper_tilde_force_pitch(t_wavesetstepper_tilde *x, t_floatarg f)
+void wavesetstepper_tilde_force_pitch(t_wavesetstepper_tilde *x, t_floatarg f1, t_floatarg f2)
 {
-  x->force_pitch = f;
+  x->forced_pitch = f1;
+  // clipping the mix factor
+  f2 = f2 > 1 ? 1 : f2;
+  f2 = f2 < 0 ? 0 : f2;
+  x->pitch_mix = f2;
 }
 
 void wavesetstepper_tilde_normalise(t_wavesetstepper_tilde *x, t_floatarg f)
@@ -350,7 +352,8 @@ void *wavesetstepper_tilde_new(t_symbol *s)
   wavesetstepper_tilde_filter(x, 0, 1);
 
   x->normalise = 0;
-  x->force_pitch = 0;
+  x->forced_pitch = 0;
+  x->pitch_mix = 0;
 
   x->update_fun_pointer = &update_wavesetstepper_tilde;
 
@@ -384,10 +387,10 @@ void wavesetstepper_tilde_setup(void)
 		  gensym("set"), A_DEFSYMBOL, 0);
   class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_filter,
 		  gensym("filter"), A_FLOAT, A_FLOAT, 0);
-  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_filter,
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_print,
 		  gensym("print"), A_GIMME, 0);
   class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_force_pitch,
-		  gensym("force_pitch"), A_FLOAT, 0);
+		  gensym("force_pitch"), A_FLOAT, A_FLOAT, 0);
   class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_normalise,
 		  gensym("normalise"), A_FLOAT, 0);
 }
