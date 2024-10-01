@@ -122,15 +122,16 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   for (i = 0; i < n; i++) {
     trig_out[i] = 0;
     // in case playing a waveset is finished, a new waveset starts playing
-    if(index > cur_waveset.end_index) {
-      index_delta = index - (t_sample)cur_waveset.end_index;
+    if(index > (t_sample)(cur_waveset.end_index + 1.0) && plb_in[i] > 0) {
+      index_delta = index - (t_sample)(cur_waveset.end_index + 1.0);
       waveset_finished = 1;
 	}
     
-    if(index < cur_waveset.start_index) {
+    if(index < (t_sample)cur_waveset.start_index && plb_in[i] <= 0) {
       index_delta = (t_sample)cur_waveset.start_index - index;
       waveset_finished = 1;
     }
+
     if(waveset_finished) {
       perform_update_counters(&step, &step_c, &delta, &delta_c, &o_fac, &o_fac_c, &is_omitted, trig_out, i);
       // filtering
@@ -141,9 +142,9 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       cur_waveset_loudness = cur_waveset.loudest;
       
       if(plb_in[i] > 0)
-	index = cur_waveset.start_index + index_delta;
+	index = (t_sample)cur_waveset.start_index + index_delta;
       else
-	index = cur_waveset.end_index - index_delta;
+	index = (t_sample)cur_waveset.end_index + 1.0 - index_delta;
       
       waveset_finished = 0;
     }
