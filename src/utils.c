@@ -11,17 +11,17 @@ void swap(int* a, int* b)
 int partition(int sorted_lookup[], int low, int high, t_waveset *waveset_array) 
 { 
   // initialize pivot to be the first element 
-  t_float pivot = waveset_array[sorted_lookup[low]].filt; 
+  int pivot = waveset_array[sorted_lookup[low]].size; 
   int i = low; 
   int j = high;
   
   while (i < j) { 
     
-    while (waveset_array[sorted_lookup[i]].filt <= pivot && i <= high - 1) { 
+    while (waveset_array[sorted_lookup[i]].size <= pivot && i <= high - 1) { 
       i++;
     } 
     
-    while (waveset_array[sorted_lookup[j]].filt > pivot && j >= low + 1) { 
+    while (waveset_array[sorted_lookup[j]].size > pivot && j >= low + 1) { 
       j--; 
     }
     if (i < j) {
@@ -44,7 +44,7 @@ void qsort_wavesets(int sorted_lookup[], int low, int high, t_waveset *waveset_a
     // half based on partition Index 
     qsort_wavesets(sorted_lookup, low, partitionIndex - 1, waveset_array);
     qsort_wavesets(sorted_lookup, partitionIndex + 1, high, waveset_array);
-  } 
+  }
 }
 
 /* implementation of the positive mod */
