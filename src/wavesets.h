@@ -7,27 +7,27 @@
 #include <m_pd.h>
 #include <puredata/g_canvas.h>
 #include <math.h>
-
-/* implementation of the reference list in the buffer object
- * if new dsp object are added everything here needs to be updated:
- *  - type of the object added to the enum and union
- *  - nodecreation und remove function
- *  - add case to add_to_reference-list
- */
+#include <stdlib.h>
 
 /* Enum for the different objects */
 typedef enum {
   wavesetstepper,
-  wavesetplayer
+  wavesetplayer,
+  wavesetclouds,
+  wavesetjitter
 } object_type;
 
 typedef struct _wavesetstepper_tilde t_wavesetstepper_tilde;
 typedef struct _wavesetplayer_tilde t_wavesetplayer_tilde;
+typedef struct _wavesetclouds_tilde t_wavesetclouds_tilde;
+typedef struct _wavesetjitter_tilde t_wavesetjitter_tilde;
 
 /* Union for different data types */
 typedef union {
   t_wavesetstepper_tilde* wavesetstepper;
   t_wavesetplayer_tilde* wavesetplayer;
+  t_wavesetclouds_tilde* wavesetclouds;
+  t_wavesetjitter_tilde* wavesetjitter;
 } reference_pointer;
 
 /* Node structure */
@@ -68,7 +68,7 @@ typedef struct _wavesetbuffer
   
   int a_vec_length;
   t_word* a_vec;
-
+  
   // a pointer to the list of all dsp-objects referencing this object
   t_ref_list *reference_listp;
   
@@ -116,15 +116,17 @@ typedef struct _wavesetstepper_tilde
 
   t_float filt_1;
   t_float filt_2;
-  int* filter_lookup;
-  int lookup_size;
 
   // the mix factor for normalizing the level
   t_float normalise;
   // value of the pitch to be forced on the played wavesets as a frequency
   t_float forced_pitch;
   t_float pitch_mix;
-
+  
+  // filter lookup is now saved here 
+  int* filter_lookup;
+  int lookup_size;
+  
   // store a function that is called by wavesetbuffer, when it changes
   void (*update_fun_pointer)(struct _wavesetstepper_tilde*);
   // index of the waveset being played in the waveset_array
@@ -136,5 +138,38 @@ typedef struct _wavesetstepper_tilde
   t_outlet* x_out, *freq_out, *trig_out;
 
 } t_wavesetstepper_tilde;
+
+/* Data types for wavesetclouds~ */
+
+typedef struct _event t_event;
+typedef struct _event_list t_event_list;
+
+typedef struct _wavesetclouds_tilde
+{
+  t_object x_obj;
+  t_symbol* buffer_name;
+  t_wavesetbuffer* bufp;
+
+  // likelyhood of a waveset being spawned in a voice in the first default inlet
+  t_float density;
+  // array of events currently played
+  t_float voices;
+  int max_voices;
+  t_event** event_array;
+  void (*update_fun_pointer)(struct _wavesetclouds_tilde*);
+
+  t_inlet *voices_in;
+  t_outlet* x_out;
+  
+} t_wavesetclouds_tilde;
+
+typedef struct _wavesetjitter_tilde
+{
+  t_object x_obj;
+  t_symbol* buffer_name;
+  t_wavesetbuffer* bufp;
+
+  void (*update_fun_pointer)(struct _wavesetjitter_tilde*);
+} t_wavesetjitter_tilde;
 
 #endif

@@ -34,6 +34,16 @@ void free_all_references(const t_ref_list* ref_listp)
       objp->bufp = NULL;
       break;
     }
+    case wavesetclouds: {
+      t_wavesetclouds_tilde* objp = current->object_pointer.wavesetclouds;
+      objp->bufp = NULL;
+      break;
+    }
+    case wavesetjitter: {
+      t_wavesetjitter_tilde* objp = current->object_pointer.wavesetjitter;
+      objp->bufp = NULL;
+      break;
+    }
     }
     current = current->next;
   }
@@ -51,28 +61,48 @@ void wavesetbuffer_free(t_wavesetbuffer *x)
 }
 
 void wavesetbuffer_print(t_wavesetbuffer *x)
-{
-  
-  //post("object name: %s\n", x->buffer_name->s_name);
-  //post("array name: %s\n", x->array_name->s_name);
-  //for(int i = 0; i < x->a_vec_length; i++)
-  //  post("%f", x->a_vec[i].w_float);
+{  
+  post("object name: %s\n", x->buffer_name->s_name);
+  post("array name: %s\n", x->array_name->s_name);
   
   if(x->num_wavesets == 0) {
-    post("waveset_array empty");
+    post("waveset array empty");
   }
-    else {
+  else {
     post("number of wavesets: %d", x->num_wavesets);
     for(int i = 0; i < x->num_wavesets; i++) {
-      t_waveset waveset = x->waveset_array[i];
-      post("i : %d", i);
-      post("size : %d", waveset.size);
-      post("start : %d", waveset.start_index);
-      post("end : %d", waveset.end_index);
-      post("filter value: %f\n", waveset.filt);
-      post("loudest: %f\n", waveset.loudest);
+    t_waveset waveset = x->waveset_array[i];
+    /*   post("i : %d", i); */
+    /*   post("size : %d", waveset.size); */
+    /*   post("start : %d", waveset.start_index); */
+    /*   post("end : %d", waveset.end_index); */
+    /*   post("filter value: %f\n", waveset.filt); */
+    post("loudest: %f\n", waveset.loudest);
     }
   }
+  // getting loudest and quietest sample
+  t_sample highest = 0;
+  t_sample lowest = 0;
+  for (int i = 0; i < x->a_vec_length; i++) {
+    t_sample samp = x->a_vec[i].w_float;
+    if (samp < lowest) lowest = samp;
+    if (samp > highest) highest = samp;
+  }
+  post("highest sample value in a_vec: %f\n", highest);
+  post("lowest sample value in a_vec: %f\n", lowest);
+  
+  // getting loudest and quietest waveset
+  highest = 0;
+  lowest = 10000000;
+  for (int i = 0; i < x->num_wavesets; i++) {
+    t_sample cur_val = x->waveset_array[i].loudest;
+    if (cur_val < lowest) lowest = cur_val;
+    if (cur_val > highest) highest = cur_val;
+  }
+  post("loudest waveset: %f\n", highest);
+  post("most quiet waveset: %f\n", lowest);
+
+  
   print_reference_list(x->reference_listp);
 }
 
@@ -119,11 +149,26 @@ void update_all_references(const t_ref_list* reference_listp)
       objp->update_fun_pointer(objp);
       break;
     }
+    case wavesetclouds: {
+      t_wavesetclouds_tilde* objp = current->object_pointer.wavesetclouds;
+      objp->update_fun_pointer(objp);
+      break;
+    }
+    case wavesetjitter: {
+      t_wavesetjitter_tilde* objp = current->object_pointer.wavesetjitter;
+      objp->update_fun_pointer(objp);
+      break;
+    }
     }
     current = current->next;
   }
 }
-  
+
+void wavesetbuffer_size(t_wavesetbuffer* x)
+{
+  outlet_float(x->f_out, x->num_wavesets);
+}
+
 void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
 {
   t_garray *a;
@@ -131,7 +176,11 @@ void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
 
   freebytes(x->a_vec, x->a_vec_length * sizeof(t_word));
   freebytes(x->sorted_lookup, x->num_wavesets * sizeof(int));
+  freebytes(x->waveset_array, x->num_wavesets * sizeof(t_waveset));
 
+  x->waveset_array = NULL;
+  x->a_vec = NULL;
+  x->sorted_lookup = NULL;
   /* finding the garray object and saving its contents into buf */
   x->array_name = array_name;
   if (!(a = (t_garray *)pd_findbyclass(array_name, garray_class))) {
@@ -142,10 +191,8 @@ void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
   } else if (!garray_getfloatwords(a, &x->a_vec_length, &buf)) {
     pd_error(x, "%s: bad template for wavesetbuffer", x->array_name->s_name);
     buf = NULL;
-  } else {
-    garray_usedindsp(a);
   }
-
+  
   /* refreshing the copy of the array */
   x->a_vec = (t_word*)getbytes(x->a_vec_length * sizeof(t_word));
   for(int i = 0; i < x->a_vec_length; i++)
@@ -157,8 +204,9 @@ void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
     x->waveset_array = NULL;
     x->num_wavesets = 0;
   }
-  else
+  else {
     analyse_wavesets(x, x->a_vec, x->a_vec_length);
+  }
 
   /* sorting the wavesetarray */
   x->sorted_lookup = (int*)getbytes(x->num_wavesets * sizeof(int));  
@@ -169,9 +217,10 @@ void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
   else {
     x->sorted = 1;
     wavesetbuffer_reset(x);
-  }  
-  x->array_name = array_name;
+  }
+  
   update_all_references(x->reference_listp);
+  outlet_float(x->f_out, x->num_wavesets);
 }
 
 void *wavesetbuffer_new(t_symbol *s1, t_symbol *s2)
@@ -196,16 +245,11 @@ void *wavesetbuffer_new(t_symbol *s1, t_symbol *s2)
      it can be found by pd_findbyclass in wavesetstepper~ */
   pd_bind(&x->x_obj.ob_pd, s1);
   
-  wavesetbuffer_set(x, s2);    
-  
   x->f_out = outlet_new(&x->x_obj, &s_float);
   
+  wavesetbuffer_set(x, s2);    
+  
   return (x);
-}
-
-void wavesetbuffer_size(t_wavesetbuffer* x)
-{
-  outlet_float(x->f_out, x->num_wavesets);
 }
 
 void wavesetbuffer_setup(void)

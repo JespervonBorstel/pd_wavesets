@@ -52,7 +52,6 @@ int* get_zerocr_arr(t_word* buf, int maxindex, int num_zerocr)
   return zerocr_arr;
 }
 
-
 void set_num_waveset(t_wavesetbuffer* x, int num_zerocr)
 {
   if(num_zerocr < 1)

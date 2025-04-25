@@ -65,7 +65,7 @@ inline void perform_update_counters(const t_float* step, t_float* step_c, const 
   // omission algorithm
   (*is_omitted) = 0;
   (*o_fac_c) += (*o_fac);
-  if (*o_fac_c > 1) {
+  if (*o_fac_c >= 1) {
     (*is_omitted) = 1;
     (*o_fac_c) = (*o_fac_c) - 1;
   }
@@ -87,6 +87,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   t_word *buf = x->bufp->a_vec;
   const t_waveset *waveset_array = x->bufp->waveset_array;
   const int* filter_lookup = x->filter_lookup;
+  // !!! muss noch verändert werden
   int lookup_size = x->lookup_size;
   
   if (!buf
@@ -94,23 +95,23 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       || !lookup_size)
     goto zero;
   
-  t_word *wp;
+  t_word *wp = NULL;
   maxindex = x->bufp->a_vec_length;
   const t_sample one_over_six = 1./6.;
   
   const int* sorted_lookup = x->bufp->sorted_lookup;
     
   int waveset_index = x->current_waveset;
-  t_waveset cur_waveset;
-  cur_waveset = waveset_array[waveset_index];
+  t_waveset cur_waveset = waveset_array[waveset_index];
 
   /* getting all values from the wavesetstepper struct */
   t_sample index = x->current_index;
   int is_omitted = x->is_omitted;
   t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac, o_fac_c = x->o_fac_c,
     delta = x->delta, delta_c = x->delta_c, step = x->step,
-    step_c = x->step_c, sr = sys_getsr(), forced_pitch = x->forced_pitch,
+    step_c = x->step_c, forced_pitch = x->forced_pitch,
     pitch_mix = x->pitch_mix;
+  t_sample sr = (t_sample)sys_getsr();
   t_sample freq = (1 / (t_sample)cur_waveset.size) * sr;
   t_sample cur_waveset_loudness = cur_waveset.loudest;
   t_sample normalise = (t_sample)x->normalise;
@@ -134,7 +135,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
 
     if(waveset_finished) {
       perform_update_counters(&step, &step_c, &delta, &delta_c, &o_fac, &o_fac_c, &is_omitted, trig_out, i);
-      // filtering
+      // filtering MUSS NOCH ANGEPASST WERDEN
       waveset_index = sorted_lookup[filter_lookup[mod((in[i] + step_c), lookup_size)]];
       
       cur_waveset = waveset_array[waveset_index];
@@ -172,6 +173,7 @@ void wavesetstepper_tilde_bang(t_wavesetstepper_tilde* x)
 {
   x->step_c = 0;
   x->delta_c = 0;
+  x->o_fac_c = 1;
 }
 
 void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s)
@@ -194,7 +196,6 @@ void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s)
       x->bufp = NULL;
   }
 }
-
 
 int is_in_filter_range(t_waveset waveset, t_float lower_filt, t_float upper_filt)
 {
@@ -303,6 +304,8 @@ void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
 void update_wavesetstepper_tilde(t_wavesetstepper_tilde *x)
 {
   wavesetstepper_tilde_filter(x, x->filt_1, x->filt_2);
+  x->current_waveset = 0;
+  x->current_index = 0;
 }
 
 void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)

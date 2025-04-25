@@ -47,6 +47,46 @@ void qsort_wavesets(int sorted_lookup[], int low, int high, t_waveset *waveset_a
   }
 }
 
+int filter_partition(int filter_lookup[], int low, int high, t_waveset *waveset_array) 
+{ 
+  // initialize pivot to be the first element 
+  int pivot = waveset_array[filter_lookup[low]].filt; 
+  int i = low; 
+  int j = high;
+  
+  while (i < j) { 
+    
+    while (waveset_array[filter_lookup[i]].filt <= pivot && i <= high - 1) { 
+      i++;
+    } 
+    
+    while (waveset_array[filter_lookup[j]].filt > pivot && j >= low + 1) { 
+      j--; 
+    }
+    if (i < j) {
+      swap(&filter_lookup[i], &filter_lookup[j]); 
+    }
+  }
+  swap(&filter_lookup[low], &filter_lookup[j]); 
+  return j; 
+}
+
+/* QuickSort function  */
+void qsort_filter(int filter_lookup[], int low, int high, t_waveset *waveset_array) 
+{ 
+  if (low < high) { 
+    
+    // call Partition function to find Partition Index 
+    int partitionIndex = filter_partition(filter_lookup, low, high, waveset_array); 
+    
+    // Recursively call quickSort() for left and right 
+    // half based on partition Index 
+    qsort_wavesets(filter_lookup, low, partitionIndex - 1, waveset_array);
+    qsort_wavesets(filter_lookup, partitionIndex + 1, high, waveset_array);
+  }
+}
+
+
 /* implementation of the positive mod */
 int mod(int i, int n)
 {
@@ -66,6 +106,8 @@ const char* get_type(object_type type) {
   switch(type) {
   case wavesetstepper: return "wavesetstepper~";
   case wavesetplayer: return "wavesetplayer~";
+  case wavesetclouds: return "wavesetclouds~";
+  case wavesetjitter: return "wavesetjitter~";
   default: return "unknown";
   }
 }
@@ -91,6 +133,22 @@ t_node* create_wavesetplayer_node(t_wavesetplayer_tilde* x) {
   t_node *new_node = (t_node *)getbytes(sizeof(t_node));
   new_node->object_pointer.wavesetplayer = x;
   new_node->type = wavesetplayer;
+  new_node->next = NULL;
+  return new_node;
+}
+
+t_node* create_wavesetclouds_node(t_wavesetclouds_tilde* x) {
+  t_node *new_node = (t_node *)getbytes(sizeof(t_node));
+  new_node->object_pointer.wavesetclouds = x;
+  new_node->type = wavesetclouds;
+  new_node->next = NULL;
+  return new_node;
+}
+
+t_node* create_wavesetjitter_node(t_wavesetjitter_tilde* x) {
+  t_node *new_node = (t_node *)getbytes(sizeof(t_node));
+  new_node->object_pointer.wavesetjitter = x;
+  new_node->type = wavesetjitter;
   new_node->next = NULL;
   return new_node;
 }
@@ -127,6 +185,17 @@ void remove_node(t_ref_list *list, object_type type, reference_pointer rp)
 	  match = 1;
 	}
 	break;
+      case wavesetclouds:
+	if (current->object_pointer.wavesetclouds == rp.wavesetclouds) {
+	  match = 1;
+	}
+	break;
+      case wavesetjitter:
+	if (current->object_pointer.wavesetjitter == rp.wavesetjitter) {
+	  match = 1;
+	}
+	break;
+
 	/* Add other cases if needed: will be needed for other objects referencing wavesetbuffer */
       }
       if(match) {
@@ -177,6 +246,17 @@ void add_to_reference_list(reference_pointer rp, object_type type, t_wavesetbuff
     append_node(bufp->reference_listp, new_node);
     break;
   }
+  case wavesetclouds: {
+    t_node* new_node = create_wavesetclouds_node(rp.wavesetclouds);
+    append_node(bufp->reference_listp, new_node);
+    break;
+  }
+  case wavesetjitter: {
+    t_node* new_node = create_wavesetjitter_node(rp.wavesetjitter);
+    append_node(bufp->reference_listp, new_node);
+    break;
+  }
+
   default: break;
   }
 }
