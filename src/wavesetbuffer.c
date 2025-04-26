@@ -73,7 +73,7 @@ void wavesetbuffer_print(t_wavesetbuffer *x)
     for(int i = 0; i < x->num_wavesets; i++) {
     t_waveset waveset = x->waveset_array[i];
     /*   post("i : %d", i); */
-    /*   post("size : %d", waveset.size); */
+    post("size : %d", waveset.size);
     /*   post("start : %d", waveset.start_index); */
     /*   post("end : %d", waveset.end_index); */
     /*   post("filter value: %f\n", waveset.filt); */
@@ -101,6 +101,7 @@ void wavesetbuffer_print(t_wavesetbuffer *x)
   }
   post("loudest waveset: %f\n", highest);
   post("most quiet waveset: %f\n", lowest);
+
 
   
   print_reference_list(x->reference_listp);

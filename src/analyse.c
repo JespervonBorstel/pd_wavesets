@@ -103,7 +103,7 @@ void set_waveset_filt(t_waveset* waveset_array, int num_wavesets)
 void set_waveset_peak_val(t_waveset* waveset, const t_word* buf)
 {
   t_sample highest = 0;
-  for(int i = waveset->start_index; i < waveset->end_index; i++) {
+  for(int i = waveset->start_index; i <= waveset->end_index; i++) {
     t_sample sample = (t_sample)fabsf(buf[i].w_float);
     if(sample > highest)
       highest = sample;

@@ -87,7 +87,6 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   t_word *buf = x->bufp->a_vec;
   const t_waveset *waveset_array = x->bufp->waveset_array;
   const int* filter_lookup = x->filter_lookup;
-  // !!! muss noch verändert werden
   int lookup_size = x->lookup_size;
   
   if (!buf
@@ -123,7 +122,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   for (i = 0; i < n; i++) {
     trig_out[i] = 0;
     // in case playing a waveset is finished, a new waveset starts playing
-    if(index > (t_sample)(cur_waveset.end_index + 1.0) && plb_in[i] > 0) {
+    if(index >= (t_sample)(cur_waveset.end_index + 1.0) && plb_in[i] > 0) {
       index_delta = index - (t_sample)(cur_waveset.end_index + 1.0);
       waveset_finished = 1;
 	}
@@ -135,7 +134,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
 
     if(waveset_finished) {
       perform_update_counters(&step, &step_c, &delta, &delta_c, &o_fac, &o_fac_c, &is_omitted, trig_out, i);
-      // filtering MUSS NOCH ANGEPASST WERDEN
+
       waveset_index = sorted_lookup[filter_lookup[mod((in[i] + step_c), lookup_size)]];
       
       cur_waveset = waveset_array[waveset_index];
@@ -305,7 +304,10 @@ void update_wavesetstepper_tilde(t_wavesetstepper_tilde *x)
 {
   wavesetstepper_tilde_filter(x, x->filt_1, x->filt_2);
   x->current_waveset = 0;
-  x->current_index = 0;
+  if (x->bufp->waveset_array) {
+    x->current_index = x->bufp->waveset_array[0].start_index;
+  }
+  else x->current_index = 0;
 }
 
 void wavesetstepper_tilde_free(t_wavesetstepper_tilde *x)
