@@ -125,7 +125,6 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
     // in case playing a waveset is finished, a new waveset starts playing
     if(index > (double)cur_waveset.end_index + 1.0 && plb_in[i] > 0) {
       index_delta = index - ((double)cur_waveset.end_index + 1.0);
-      post("index delta: %f", index_delta);
       waveset_finished = 1;
     }
     
@@ -147,11 +146,6 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
 	index = (double)cur_waveset.start_index + index_delta * (forced_pitch / freq) * pitch_mix + index_delta * (1 - pitch_mix);
       else
 	index = (double)cur_waveset.end_index + 1.0 - (index_delta * (forced_pitch / freq) * pitch_mix + index_delta * (1 - pitch_mix));
-
-      post("inc: %f", ((forced_pitch / freq) * copysignf(1.0, plb_in[i])) * (double)pitch_mix + plb_in[i] * (1.0 - (double)pitch_mix));
-      post("waveset index: %d", waveset_index); 
-      post("wavesetdata: %d %d", cur_waveset.start_index, cur_waveset.end_index);
-      post("index: %f", index);
 	   
       waveset_finished = 0;
     }
