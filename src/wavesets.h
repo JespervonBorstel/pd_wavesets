@@ -132,7 +132,7 @@ typedef struct _wavesetstepper_tilde
   // index of the waveset being played in the waveset_array
   int current_waveset;
   // index of the currently played sample
-  t_sample current_index;
+  double current_index;
   
   t_inlet* step_in, *plb_in, *delta_in, *o_fac_in;
   t_outlet* x_out, *freq_out, *trig_out;

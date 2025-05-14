@@ -76,7 +76,7 @@ void set_waveset_sizes (t_wavesetbuffer* x)
 {
   for(int i = 0; i < x->num_wavesets; i++) {
     t_waveset* waveset = &x->waveset_array[i];
-    waveset->size = (waveset->end_index - waveset->start_index) + 1;
+    waveset->size = (waveset->end_index + 1) - waveset->start_index;
   }
 }
 
@@ -130,8 +130,8 @@ void analyse_wavesets(t_wavesetbuffer *x, t_word* buf, int maxindex)
   
   for(int i = 0; i < (num_zerocr - 1); i++) {
     int j = i + 1;
-    waveset_array[i].start_index = zerocr_arr[i];
-    waveset_array[i].end_index = zerocr_arr[j] - 1;
+    waveset_array[i].start_index = zerocr_arr[i] + 1;
+    waveset_array[i].end_index = zerocr_arr[j];
   }
   
   set_waveset_sizes(x);

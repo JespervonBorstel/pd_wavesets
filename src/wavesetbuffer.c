@@ -175,6 +175,11 @@ void wavesetbuffer_set(t_wavesetbuffer *x, t_symbol *array_name)
   t_garray *a;
   t_word* buf;
 
+  if (!array_name) {
+    pd_error(x, "wavesetbuffer: please provide the name of the array");
+    return;
+  }
+
   freebytes(x->a_vec, x->a_vec_length * sizeof(t_word));
   freebytes(x->sorted_lookup, x->num_wavesets * sizeof(int));
   freebytes(x->waveset_array, x->num_wavesets * sizeof(t_waveset));

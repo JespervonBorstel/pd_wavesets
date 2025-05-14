@@ -11,11 +11,11 @@
 
 /* functions to clean up the perform routine */
 
-inline t_sample four_point_interpolate(t_word *buf, t_word *wp, const t_sample idx,
+inline t_sample four_point_interpolate(t_word *buf, t_word *wp, const double idx,
 				       const int maxindex, const t_sample one_over_six)
 {
   t_sample out_samp;
-  double findex = (double)idx;
+  double findex = idx;
   int index = findex;
   t_sample frac,  a,  b,  c,  d, cminusb;
   if (index < 1)
@@ -80,7 +80,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   t_sample *freq_out = (t_sample *)(w[5]);
   t_sample *trig_out = (t_sample *)(w[6]);
   int n = (int)(w[7]), i, maxindex;
-  
+
   if(!x->bufp)
     goto zero;
 
@@ -104,31 +104,33 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   t_waveset cur_waveset = waveset_array[waveset_index];
 
   /* getting all values from the wavesetstepper struct */
-  t_sample index = x->current_index;
+  double index = x->current_index;
+  double index_inc;
   int is_omitted = x->is_omitted;
   t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac, o_fac_c = x->o_fac_c,
     delta = x->delta, delta_c = x->delta_c, step = x->step,
     step_c = x->step_c, forced_pitch = x->forced_pitch,
     pitch_mix = x->pitch_mix;
-  t_sample sr = (t_sample)sys_getsr();
-  t_sample freq = (1 / (t_sample)cur_waveset.size) * sr;
+  double sr = (double)sys_getsr();
+  double freq = sr / (double)cur_waveset.size;
   t_sample cur_waveset_loudness = cur_waveset.loudest;
   t_sample normalise = (t_sample)x->normalise;
   // flag for the dsp loop to indicate that a new waveset is to be played
   int waveset_finished = 0;
-  t_sample index_delta = 0;
-  maxindex -= 1;
+  double index_delta;
+  maxindex -= 3;
   
   for (i = 0; i < n; i++) {
     trig_out[i] = 0;
     // in case playing a waveset is finished, a new waveset starts playing
-    if(index >= (t_sample)(cur_waveset.end_index + 1.0) && plb_in[i] > 0) {
-      index_delta = index - (t_sample)(cur_waveset.end_index + 1.0);
+    if(index > (double)cur_waveset.end_index + 1.0 && plb_in[i] > 0) {
+      index_delta = index - ((double)cur_waveset.end_index + 1.0);
+      post("index delta: %f", index_delta);
       waveset_finished = 1;
-	}
+    }
     
-    if(index < (t_sample)cur_waveset.start_index && plb_in[i] <= 0) {
-      index_delta = (t_sample)cur_waveset.start_index - index;
+    if(index < (double)cur_waveset.start_index && plb_in[i] <= 0) {
+      index_delta = (double)cur_waveset.start_index - index;
       waveset_finished = 1;
     }
 
@@ -138,22 +140,28 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       waveset_index = sorted_lookup[filter_lookup[mod((in[i] + step_c), lookup_size)]];
       
       cur_waveset = waveset_array[waveset_index];
-      freq = (1 / (t_sample)cur_waveset.size) * sr;
+      freq = sr / (double)cur_waveset.size;
       cur_waveset_loudness = cur_waveset.loudest;
-      
+
       if(plb_in[i] > 0)
-	index = (t_sample)cur_waveset.start_index + index_delta;
+	index = (double)cur_waveset.start_index + index_delta * (forced_pitch / freq) * pitch_mix + index_delta * (1 - pitch_mix);
       else
-	index = (t_sample)cur_waveset.end_index + 1.0 - index_delta;
-      
+	index = (double)cur_waveset.end_index + 1.0 - (index_delta * (forced_pitch / freq) * pitch_mix + index_delta * (1 - pitch_mix));
+
+      post("inc: %f", ((forced_pitch / freq) * copysignf(1.0, plb_in[i])) * (double)pitch_mix + plb_in[i] * (1.0 - (double)pitch_mix));
+      post("waveset index: %d", waveset_index); 
+      post("wavesetdata: %d %d", cur_waveset.start_index, cur_waveset.end_index);
+      post("index: %f", index);
+	   
       waveset_finished = 0;
     }
     *out++ = four_point_interpolate(buf, wp, index, maxindex, one_over_six)
       * is_omitted
       * ((normalise / cur_waveset_loudness) + (1.0 - normalise));
     *freq_out++ = freq;
-    
-    index += ((forced_pitch / freq) * copysign(1.0, plb_in[i])) * pitch_mix + plb_in[i] * (1 - pitch_mix);
+
+    index_inc = ((forced_pitch / freq) * copysignf(1.0, plb_in[i])) * (double)pitch_mix + plb_in[i] * (1.0 - (double)pitch_mix);
+    index += index_inc;
 
   }
   perform_update_wavesetstepper(x, step_c, delta_c, o_fac_c, waveset_index, index, is_omitted);
@@ -164,7 +172,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
     *out++ = 0;
     *trig_out++ = 0;
     *freq_out++ = 0;
-  } 
+  }
   return (w+8);
 }
 
@@ -173,6 +181,8 @@ void wavesetstepper_tilde_bang(t_wavesetstepper_tilde* x)
   x->step_c = 0;
   x->delta_c = 0;
   x->o_fac_c = 1;
+  x->current_waveset = (int)x->x_f;
+  x->current_index = (double)x->bufp->waveset_array[x->current_waveset].start_index;
 }
 
 void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s)
@@ -198,10 +208,10 @@ void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s)
 
 int is_in_filter_range(t_waveset waveset, t_float lower_filt, t_float upper_filt)
 {
-  int bool = 0;
+  int boolean = 0;
   if((waveset.filt >= lower_filt) && (waveset.filt <= upper_filt))
-    bool = 1;
-  return bool;
+    boolean = 1;
+  return boolean;
 }
 
 int count_in_filter_range(t_waveset* waveset_array, int num_wavesets,

@@ -2,7 +2,7 @@
 #include "utils.h"
 #include "classes.h"
 
-void update_wavesetplayer_tilde()
+void update_wavesetplayer_tilde(t_wavesetplayer_tilde *x)
 {
 }
 
