@@ -50,7 +50,8 @@ inline void perform_update_wavesetstepper(t_wavesetstepper_tilde *x, t_float ste
 /* updates all counter variables when a new waveset starts playing */
 inline void perform_update_counters(const t_float* step, t_float* step_c, const t_float* delta,
 				    t_float* delta_c, const t_float* o_fac, t_float* o_fac_c,
-				    int* is_omitted, t_sample* trig_out, int i)
+				    int* is_omitted, t_sample* trig_out, int i,
+				    t_wavesetstepper_tilde *x)
 {
   (*step_c) += (*step);
   (*delta_c) += 1;
@@ -60,6 +61,9 @@ inline void perform_update_counters(const t_float* step, t_float* step_c, const 
     trig_out[i] = 1;
     (*step_c) = 0;
     (*delta_c) = 0;
+    if(!x->loop) {
+      x->loop_finished = 1;
+    }
   }
   
   // omission algorithm
@@ -88,10 +92,12 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   const t_waveset *waveset_array = x->bufp->waveset_array;
   const int* filter_lookup = x->filter_lookup;
   int lookup_size = x->lookup_size;
-  
+  int waveset_index = x->current_waveset;
+    
   if (!buf
       || !waveset_array
-      || !lookup_size)
+      || !lookup_size
+      || x->loop_finished)
     goto zero;
   
   t_word *wp = NULL;
@@ -100,7 +106,6 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   
   const int* sorted_lookup = x->bufp->sorted_lookup;
     
-  int waveset_index = x->current_waveset;
   t_waveset cur_waveset = waveset_array[waveset_index];
 
   /* getting all values from the wavesetstepper struct */
@@ -119,8 +124,9 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
   int waveset_finished = 0;
   double index_delta;
   maxindex -= 3;
+  i = 0;
   
-  for (i = 0; i < n; i++) {
+  while (n--) {
     trig_out[i] = 0;
     // in case playing a waveset is finished, a new waveset starts playing
     if(index > (double)cur_waveset.end_index + 1.0 && plb_in[i] > 0) {
@@ -134,9 +140,13 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
     }
 
     if(waveset_finished) {
-      perform_update_counters(&step, &step_c, &delta, &delta_c, &o_fac, &o_fac_c, &is_omitted, trig_out, i);
-
-      waveset_index = sorted_lookup[filter_lookup[mod((in[i] + step_c), lookup_size)]];
+      perform_update_counters(&step, &step_c, &delta, &delta_c, &o_fac, &o_fac_c, &is_omitted, trig_out, i, x);
+      if (x->loop_finished) {
+	n++;
+	goto zero;
+      }
+      
+      waveset_index = sorted_lookup[filter_lookup[mod(in[i] + step_c, lookup_size)]];
       
       cur_waveset = waveset_array[waveset_index];
       freq = sr / (double)cur_waveset.size;
@@ -156,7 +166,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
 
     index_inc = ((forced_pitch / freq) * copysignf(1.0, plb_in[i])) * (double)pitch_mix + plb_in[i] * (1.0 - (double)pitch_mix);
     index += index_inc;
-
+    i++;
   }
   perform_update_wavesetstepper(x, step_c, delta_c, o_fac_c, waveset_index, index, is_omitted);
   return (w+8);
@@ -177,6 +187,7 @@ void wavesetstepper_tilde_bang(t_wavesetstepper_tilde* x)
   x->o_fac_c = 1;
   x->current_waveset = (int)x->x_f;
   x->current_index = (double)x->bufp->waveset_array[x->current_waveset].start_index;
+  x->loop_finished = 0; 
 }
 
 void wavesetstepper_tilde_set(t_wavesetstepper_tilde *x, t_symbol *s)
@@ -296,6 +307,12 @@ void wavesetstepper_tilde_normalise(t_wavesetstepper_tilde *x, t_floatarg f)
   x->normalise = f;
 }
 
+void wavesetstepper_tilde_loop(t_wavesetstepper_tilde *x, t_floatarg f)
+{
+  x->loop = f;
+  if(f) x->loop_finished = 0;
+}
+
 void wavesetstepper_tilde_dsp(t_wavesetstepper_tilde *x, t_signal **sp)
 {
   dsp_add(wavesetstepper_tilde_perform, 7, x,
@@ -365,6 +382,9 @@ void *wavesetstepper_tilde_new(t_symbol *s)
   x->forced_pitch = 0;
   x->pitch_mix = 0;
 
+  x->loop = 1;
+  x->loop_finished = 0;
+  
   x->update_fun_pointer = &update_wavesetstepper_tilde;
 
   x->plb_in = inlet_new(&x->x_obj, &x->x_obj.ob_pd, &s_signal, &s_signal);
@@ -403,4 +423,5 @@ void wavesetstepper_tilde_setup(void)
 		  gensym("force_pitch"), A_FLOAT, A_FLOAT, 0);
   class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_normalise,
 		  gensym("normalise"), A_FLOAT, 0);
+  class_addmethod(wavesetstepper_tilde_class, (t_method)wavesetstepper_tilde_loop, gensym("loop"), A_FLOAT, 0);
 }

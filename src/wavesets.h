@@ -122,6 +122,10 @@ typedef struct _wavesetstepper_tilde
   // value of the pitch to be forced on the played wavesets as a frequency
   t_float forced_pitch;
   t_float pitch_mix;
+
+  // boolean wether the wavesetarray is looped or not 
+  t_float loop;
+  t_float loop_finished;
   
   // filter lookup is now saved here 
   int* filter_lookup;
