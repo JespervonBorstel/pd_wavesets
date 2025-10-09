@@ -70,15 +70,15 @@ void wavesetbuffer_print(t_wavesetbuffer *x)
   }
   else {
     post("number of wavesets: %d", x->num_wavesets);
-    for(int i = 0; i < x->num_wavesets; i++) {
-    t_waveset waveset = x->waveset_array[i];
+    // for(int i = 0; i < x->num_wavesets; i++) {
+    // t_waveset waveset = x->waveset_array[i];
     /*   post("i : %d", i); */
-    post("size : %d", waveset.size);
+    // post("size : %d", waveset.size);
     /*   post("start : %d", waveset.start_index); */
     /*   post("end : %d", waveset.end_index); */
     /*   post("filter value: %f\n", waveset.filt); */
-    post("loudest: %f\n", waveset.loudest);
-    }
+    // post("loudest: %f\n", waveset.loudest);
+    //}
   }
   // getting loudest and quietest sample
   t_sample highest = 0;

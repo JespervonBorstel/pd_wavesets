@@ -99,7 +99,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
       || !lookup_size
       || x->loop_finished)
     goto zero;
-  
+
   t_word *wp = NULL;
   maxindex = x->bufp->a_vec_length;
   const t_sample one_over_six = 1./6.;
@@ -110,7 +110,7 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
 
   /* getting all values from the wavesetstepper struct */
   double index = x->current_index;
-  double index_inc;
+  double index_inc = 0;
   int is_omitted = x->is_omitted;
   t_float o_fac = (x->o_fac < 0) ? 0 : x->o_fac, o_fac_c = x->o_fac_c,
     delta = x->delta, delta_c = x->delta_c, step = x->step,
@@ -159,12 +159,13 @@ t_int *wavesetstepper_tilde_perform(t_int *w)
 	   
       waveset_finished = 0;
     }
+    index_inc = ((forced_pitch / freq) * (double)copysign(1.0, plb_in[i])) * (double)pitch_mix + plb_in[i] * (1.0 - (double)pitch_mix);
+    
     *out++ = four_point_interpolate(buf, wp, index, maxindex, one_over_six)
       * is_omitted
       * ((normalise / cur_waveset_loudness) + (1.0 - normalise));
     *freq_out++ = freq;
 
-    index_inc = ((forced_pitch / freq) * copysignf(1.0, plb_in[i])) * (double)pitch_mix + plb_in[i] * (1.0 - (double)pitch_mix);
     index += index_inc;
     i++;
   }
